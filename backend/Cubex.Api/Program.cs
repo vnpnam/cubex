@@ -1,0 +1,126 @@
+using System.Text;
+using Cubex.Api.Data;
+using Cubex.Api.Entities;
+using Cubex.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Add Configuration & DbContext (SQL Server with SQLite dev support)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? "Server=(localdb)\\mssqllocaldb;Database=CubexDb;Trusted_Connection=True;MultipleActiveResultSets=true";
+
+var dbProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
+
+builder.Services.AddDbContext<CubexDbContext>(options =>
+{
+    if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        options.UseSqlite("Data Source=cubex.db");
+    }
+});
+
+// 2. Add ASP.NET Core Identity
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequiredLength = 6;
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<CubexDbContext>()
+.AddDefaultTokenProviders();
+
+// 3. Add JWT Authentication
+var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "CubexSpeedcubingSecretKey2026SuperSecureTokenKeyLongEnough!";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "CubexApi";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "CubexClient";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+
+// 4. Register Services
+builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddSingleton<IScrambleService, ScrambleService>();
+builder.Services.AddSingleton<IStatsService, StatsService>();
+
+// 5. Add Controllers & CORS
+builder.Services.AddControllers();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CubexCors", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000", "https://localhost:3000", "http://localhost:3001")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+// 6. OpenAPI support (.NET 10 built-in)
+builder.Services.AddOpenApi();
+
+var app = builder.Build();
+
+// Auto-migrate & seed database
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<CubexDbContext>();
+        context.Database.EnsureCreated();
+
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+        await SeedData.InitializeAsync(context, userManager, roleManager);
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
+// HTTP pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.UseCors("CubexCors");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
