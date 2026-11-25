@@ -20,12 +20,193 @@ interface SharedRoomSnapshot {
   status: MatchStatus;
   bestOf: number;
   hostUserId: string;
-  players: MatchPlayer[];
+  players: (MatchPlayer & { readyForRound?: number })[];
   currentRound: MatchRound | null;
   rounds: MatchRound[];
   matchWinnerId: string | null;
   matchWinnerName: string | null;
   updatedAt: number;
+}
+
+/**
+ * Client-side deterministic reconciliation so local P2P tabs and server snapshots
+ * always converge to the exact same round/winner/ready state.
+ */
+function reconcileClientSnapshot(room: SharedRoomSnapshot): SharedRoomSnapshot {
+  const bestOf = room.bestOf || 3;
+  const neededWins = Math.ceil(bestOf / 2);
+  let players = [...(room.players || [])];
+
+  // Reconcile rounds by roundNumber
+  const roundsByNum = new Map<number, MatchRound>();
+  for (const r of room.rounds || []) {
+    const num = r.roundNumber || 1;
+    const prev = roundsByNum.get(num);
+    if (!prev) {
+      roundsByNum.set(num, { ...r, roundId: num, roundNumber: num });
+    } else {
+      const resByUser = new Map<string, RoundResult>();
+      for (const res of prev.results || []) resByUser.set(res.userId, res);
+      for (const res of r.results || []) resByUser.set(res.userId, res);
+      roundsByNum.set(num, {
+        ...prev,
+        scramble: prev.scramble || r.scramble,
+        results: Array.from(resByUser.values()),
+        status: prev.status === 'finished' || r.status === 'finished' ? 'finished' : 'solving',
+      });
+    }
+  }
+
+  if (room.currentRound) {
+    const num = room.currentRound.roundNumber || 1;
+    const prev = roundsByNum.get(num);
+    if (!prev) {
+      roundsByNum.set(num, { ...room.currentRound, roundId: num, roundNumber: num });
+    } else {
+      const resByUser = new Map<string, RoundResult>();
+      for (const res of prev.results || []) resByUser.set(res.userId, res);
+      for (const res of room.currentRound.results || []) resByUser.set(res.userId, res);
+      roundsByNum.set(num, {
+        ...prev,
+        results: Array.from(resByUser.values()),
+        status:
+          prev.status === 'finished' || room.currentRound.status === 'finished'
+            ? 'finished'
+            : 'solving',
+      });
+    }
+  }
+
+  const sortedRounds = Array.from(roundsByNum.values()).sort(
+    (a, b) => a.roundNumber - b.roundNumber
+  );
+
+  const winsByUser = new Map<string, number>();
+  for (const p of players) winsByUser.set(p.userId, 0);
+
+  const hasBot = players.some((p) => p.userId === BOT_USER_ID);
+
+  const evaluatedRounds: MatchRound[] = sortedRounds.map((round) => {
+    const resByUser = new Map<string, RoundResult>();
+    for (const r of round.results || []) resByUser.set(r.userId, r);
+
+    if (hasBot && resByUser.size === 1 && !resByUser.has(BOT_USER_ID)) {
+      const botTimeMs = Math.round(9800 + Math.random() * 3800);
+      resByUser.set(BOT_USER_ID, {
+        userId: BOT_USER_ID,
+        timeMs: botTimeMs,
+        isDnf: false,
+        isWinner: false,
+      });
+    }
+
+    const allResults = Array.from(resByUser.values());
+
+    if (players.length === 2 && allResults.length >= 2) {
+      const validResults = allResults
+        .filter((r) => !r.isDnf && r.timeMs !== null)
+        .sort((a, b) => (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity));
+      const winnerId = validResults[0]?.userId ?? null;
+
+      const finalResults = allResults.map((r) => ({
+        ...r,
+        isWinner: winnerId !== null && r.userId === winnerId,
+      }));
+
+      if (winnerId) {
+        winsByUser.set(winnerId, (winsByUser.get(winnerId) || 0) + 1);
+      }
+
+      return {
+        ...round,
+        roundId: round.roundNumber,
+        results: finalResults,
+        status: 'finished',
+      };
+    }
+
+    return {
+      ...round,
+      roundId: round.roundNumber,
+      results: allResults,
+      status: 'solving',
+    };
+  });
+
+  players = players.map((p) => ({
+    ...p,
+    wins: winsByUser.get(p.userId) ?? p.wins ?? 0,
+  }));
+
+  let currentRound: MatchRound | null =
+    evaluatedRounds.length > 0 ? evaluatedRounds[evaluatedRounds.length - 1] : null;
+
+  if (currentRound && currentRound.status === 'solving') {
+    players = players.map((p) => ({
+      ...p,
+      isReady: p.userId === BOT_USER_ID,
+    }));
+  }
+
+  if (currentRound && currentRound.status === 'finished') {
+    const nextRoundNum = currentRound.roundNumber + 1;
+    players = players.map((p) => ({
+      ...p,
+      isReady: p.userId === BOT_USER_ID || (p.readyForRound ?? 0) >= nextRoundNum,
+    }));
+  }
+
+  const matchWinner = players.find((p) => p.wins >= neededWins);
+  if (matchWinner) {
+    return {
+      ...room,
+      bestOf,
+      status: 'finished',
+      players: players.map((p) => ({ ...p, isReady: false })),
+      currentRound,
+      rounds: evaluatedRounds,
+      matchWinnerId: matchWinner.userId,
+      matchWinnerName: matchWinner.displayName,
+      updatedAt: Date.now(),
+    };
+  }
+
+  const targetNextRoundNum = evaluatedRounds.length + 1;
+  const canStartNextRound =
+    players.length === 2 &&
+    (!currentRound || currentRound.status === 'finished') &&
+    players.every((p) => p.isReady || (p.readyForRound ?? 0) >= targetNextRoundNum);
+
+  if (canStartNextRound) {
+    const newRound: MatchRound = {
+      roundId: targetNextRoundNum,
+      roundNumber: targetNextRoundNum,
+      scramble: generateLocal3x3Scramble(20),
+      startedAt: new Date().toISOString(),
+      results: [],
+      status: 'solving',
+    };
+    evaluatedRounds.push(newRound);
+    currentRound = newRound;
+    players = players.map((p) => ({
+      ...p,
+      isReady: p.userId === BOT_USER_ID,
+    }));
+  }
+
+  const status: MatchStatus = evaluatedRounds.length > 0 ? 'playing' : 'waiting';
+
+  return {
+    ...room,
+    bestOf,
+    status,
+    players,
+    currentRound,
+    rounds: evaluatedRounds,
+    matchWinnerId: null,
+    matchWinnerName: null,
+    updatedAt: Date.now(),
+  };
 }
 
 /**
@@ -93,7 +274,70 @@ function buildSnapshotFromStore(): SharedRoomSnapshot | null {
   };
 }
 
-function applySnapshotToStore(snapshot: SharedRoomSnapshot) {
+function mergeClientSnapshots(
+  a: SharedRoomSnapshot | null,
+  b: SharedRoomSnapshot | null
+): SharedRoomSnapshot | null {
+  if (!a) return b ? reconcileClientSnapshot(b) : null;
+  if (!b) return reconcileClientSnapshot(a);
+
+  const nextRoundA = (a.rounds?.length || 0) + 1;
+  const nextRoundB = (b.rounds?.length || 0) + 1;
+
+  const playerMap = new Map<string, MatchPlayer & { readyForRound?: number }>();
+  for (const p of a.players || []) {
+    playerMap.set(p.userId, {
+      ...p,
+      readyForRound: p.readyForRound ?? (p.isReady ? nextRoundA : 0),
+    });
+  }
+  for (const p of b.players || []) {
+    const incomingReadyRound = p.readyForRound ?? (p.isReady ? nextRoundB : 0);
+    if (!playerMap.has(p.userId)) {
+      if (playerMap.size < 2) {
+        const firstPlayer = Array.from(playerMap.values())[0];
+        const displayName =
+          firstPlayer && firstPlayer.displayName === p.displayName
+            ? `${p.displayName} (Đối thủ)`
+            : p.displayName;
+        playerMap.set(p.userId, {
+          ...p,
+          displayName,
+          readyForRound: incomingReadyRound,
+        });
+      }
+    } else {
+      const prev = playerMap.get(p.userId)!;
+      const maxReadyRound = Math.max(prev.readyForRound ?? 0, incomingReadyRound);
+      playerMap.set(p.userId, {
+        ...prev,
+        readyForRound: maxReadyRound,
+        isReady: prev.isReady || p.isReady,
+        wins: Math.max(prev.wins, p.wins),
+      });
+    }
+  }
+
+  const combinedRounds = [...(a.rounds || []), ...(b.rounds || [])];
+  if (a.currentRound) combinedRounds.push(a.currentRound);
+  if (b.currentRound) combinedRounds.push(b.currentRound);
+
+  return reconcileClientSnapshot({
+    code: a.code || b.code,
+    status: a.status === 'playing' || b.status === 'playing' ? 'playing' : a.status,
+    bestOf: a.bestOf || b.bestOf || 3,
+    hostUserId: a.hostUserId || b.hostUserId,
+    players: Array.from(playerMap.values()),
+    currentRound: b.currentRound || a.currentRound,
+    rounds: combinedRounds,
+    matchWinnerId: a.matchWinnerId || b.matchWinnerId,
+    matchWinnerName: a.matchWinnerName || b.matchWinnerName,
+    updatedAt: Date.now(),
+  });
+}
+
+function applySnapshotToStore(rawSnapshot: SharedRoomSnapshot) {
+  const snapshot = reconcileClientSnapshot(rawSnapshot);
   const store = useMatchStore.getState();
   if (store.roomCode && store.roomCode !== snapshot.code) return;
 
@@ -154,8 +398,10 @@ function startServerSyncLoop() {
     });
 
     if (serverRoom && useMatchStore.getState().roomCode === code) {
-      writeSharedRoom(serverRoom);
-      applySnapshotToStore(serverRoom);
+      const latestLocal = readSharedRoom(code) || buildSnapshotFromStore();
+      const merged = mergeClientSnapshots(latestLocal, serverRoom) || serverRoom;
+      writeSharedRoom(merged);
+      applySnapshotToStore(merged);
     }
   }, 1000);
 }
@@ -459,44 +705,18 @@ export async function setReady(ready: boolean) {
   const existing = readSharedRoom(code) || buildSnapshotFromStore();
   if (!existing) return;
 
-  let players = existing.players.map((p) =>
-    p.userId === me.userId ? { ...p, isReady: ready } : p
+  const targetNextRound = (existing.rounds?.length || 0) + 1;
+  const players = existing.players.map((p) =>
+    p.userId === me.userId
+      ? { ...p, isReady: ready, readyForRound: ready ? targetNextRound : 0 }
+      : p
   );
 
-  if (players.some((p) => p.userId === BOT_USER_ID)) {
-    players = players.map((p) => (p.userId === BOT_USER_ID ? { ...p, isReady: true } : p));
-  }
-
-  const bothReady = players.length === 2 && players.every((p) => p.isReady);
-
-  let status: MatchStatus = existing.status;
-  let currentRound = existing.currentRound;
-  const rounds = [...existing.rounds];
-  const scramble = generateLocal3x3Scramble(20);
-
-  if (bothReady && (existing.status === 'waiting' || existing.currentRound?.status === 'finished')) {
-    status = 'playing';
-    const nextRoundNum = rounds.length + 1;
-    const newRound: MatchRound = {
-      roundId: Date.now(),
-      roundNumber: nextRoundNum,
-      scramble,
-      startedAt: new Date().toISOString(),
-      results: [],
-      status: 'solving',
-    };
-    currentRound = newRound;
-    rounds.push(newRound);
-  }
-
-  const updated: SharedRoomSnapshot = {
+  const updated = reconcileClientSnapshot({
     ...existing,
-    status,
     players,
-    currentRound,
-    rounds,
     updatedAt: Date.now(),
-  };
+  });
 
   writeSharedRoom(updated);
   applySnapshotToStore(updated);
@@ -506,12 +726,14 @@ export async function setReady(ready: boolean) {
     code,
     userId: me.userId,
     ready,
-    scramble,
+    scramble: updated.currentRound?.scramble || generateLocal3x3Scramble(20),
     snapshot: updated,
   });
   if (serverRoom) {
-    writeSharedRoom(serverRoom);
-    applySnapshotToStore(serverRoom);
+    const latestLocal = readSharedRoom(code) || updated;
+    const merged = mergeClientSnapshots(latestLocal, serverRoom) || serverRoom;
+    writeSharedRoom(merged);
+    applySnapshotToStore(merged);
   }
 }
 
@@ -538,73 +760,21 @@ export async function submitResult(_roundId: number, timeMs: number | null) {
   if (existingIdx >= 0) results[existingIdx] = myEntry;
   else results.push(myEntry);
 
-  const hasBot = existing.players.some((p) => p.userId === BOT_USER_ID);
-  if (hasBot && !results.some((r) => r.userId === BOT_USER_ID)) {
-    const botTimeMs = Math.round(9800 + Math.random() * 3800);
-    results.push({
-      userId: BOT_USER_ID,
-      timeMs: botTimeMs,
-      isDnf: false,
-      isWinner: false,
-    });
-  }
-
-  let currentRound: MatchRound = {
+  const currentRound: MatchRound = {
     ...existing.currentRound,
     results,
   };
-  let players = [...existing.players];
-  let status: MatchStatus = existing.status;
-  let matchWinnerId = existing.matchWinnerId;
-  let matchWinnerName = existing.matchWinnerName;
-
-  if (results.length >= existing.players.length && existing.players.length === 2) {
-    const validResults = results
-      .filter((r) => !r.isDnf && r.timeMs !== null)
-      .sort((a, b) => (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity));
-
-    const roundWinnerId = validResults[0]?.userId ?? null;
-
-    const finalResults = results.map((r) => ({
-      ...r,
-      isWinner: roundWinnerId !== null && r.userId === roundWinnerId,
-    }));
-
-    players = players.map((p) => ({
-      ...p,
-      wins: p.wins + (p.userId === roundWinnerId ? 1 : 0),
-      isReady: p.userId === BOT_USER_ID,
-    }));
-
-    currentRound = {
-      ...currentRound,
-      results: finalResults,
-      status: 'finished',
-    };
-
-    const neededWins = Math.ceil(existing.bestOf / 2);
-    const matchWinner = players.find((p) => p.wins >= neededWins);
-    if (matchWinner) {
-      status = 'finished';
-      matchWinnerId = matchWinner.userId;
-      matchWinnerName = matchWinner.displayName;
-    }
-  }
 
   const rounds = existing.rounds.map((r) =>
-    r.roundId === currentRound.roundId ? currentRound : r
+    r.roundNumber === currentRound.roundNumber ? currentRound : r
   );
 
-  const updated: SharedRoomSnapshot = {
+  const updated = reconcileClientSnapshot({
     ...existing,
-    status,
-    players,
     currentRound,
     rounds,
-    matchWinnerId,
-    matchWinnerName,
     updatedAt: Date.now(),
-  };
+  });
 
   writeSharedRoom(updated);
   applySnapshotToStore(updated);
@@ -617,8 +787,10 @@ export async function submitResult(_roundId: number, timeMs: number | null) {
     snapshot: updated,
   });
   if (serverRoom) {
-    writeSharedRoom(serverRoom);
-    applySnapshotToStore(serverRoom);
+    const latestLocal = readSharedRoom(code) || updated;
+    const merged = mergeClientSnapshots(latestLocal, serverRoom) || serverRoom;
+    writeSharedRoom(merged);
+    applySnapshotToStore(merged);
   }
 }
 

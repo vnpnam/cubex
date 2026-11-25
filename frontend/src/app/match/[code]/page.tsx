@@ -1062,6 +1062,19 @@ export default function MatchRoomPage() {
                   })}
                 </div>
 
+                {/* Waiting for opponent to finish solving this round */}
+                {store.currentRound.status === 'solving' &&
+                  store.currentRound.results.length === 1 && (
+                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-center gap-2 text-xs text-[#00F0FF]">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>
+                        {myRoundResult
+                          ? 'Đã ghi nhận thời gian của bạn! Đang chờ đối thủ giải xong vòng này...'
+                          : 'Đối thủ đã giải xong! Hãy hoàn thành lượt giải của bạn...'}
+                      </span>
+                    </div>
+                  )}
+
                 {/* Next round ready button */}
                 {store.currentRound.status === 'finished' &&
                   store.roomStatus === 'playing' &&
