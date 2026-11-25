@@ -518,7 +518,10 @@ export function MusicPlayer() {
   const track = store.currentTrack;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 select-none">
+    <div
+      className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50 select-none max-w-[calc(100vw-1.5rem)]"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <AnimatePresence mode="wait">
         {store.isExpanded ? (
           /* ── Expanded Player ─────────────────────────────────────────── */
@@ -528,7 +531,7 @@ export function MusicPlayer() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="w-80 bg-[#0A0F1E]/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+            className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[82dvh] overflow-y-auto bg-[#0A0F1E]/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -895,7 +898,7 @@ export function MusicPlayer() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 8 }}
                   transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-                  className="w-56 bg-[#0A0F1E]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+                  className="w-[min(14rem,calc(100vw-1.5rem))] bg-[#0A0F1E]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
                 >
                   {/* Source tabs */}
                   <div className="flex border-b border-white/5">
@@ -995,7 +998,7 @@ export function MusicPlayer() {
                   step={0.02}
                   value={store.volume}
                   onChange={(e) => store.setVolume(parseFloat(e.target.value))}
-                  className="w-14 h-0.5 accent-[#00F0FF] cursor-pointer"
+                  className="w-12 sm:w-14 h-0.5 accent-[#00F0FF] cursor-pointer hidden min-[370px]:block"
                   title={`Âm lượng: ${Math.round(store.volume * 100)}%`}
                 />
               </div>

@@ -1,6 +1,14 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { MusicPlayer } from '@/components/music/MusicPlayer';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#06090f',
+};
 
 export const metadata: Metadata = {
   title: 'CUBEX – The Art of Speedcubing | WCA Standard Rubik 3x3 Platform',

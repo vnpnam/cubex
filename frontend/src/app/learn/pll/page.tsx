@@ -432,12 +432,12 @@ export default function PLLPage() {
       <Navbar activeTab="learn" />
 
       <div className="bg-[#080c15]/90 backdrop-blur-xl border-b border-white/[0.08]">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Học CFOP:</span>
-            <nav className="flex gap-1">
+        <div className="max-w-6xl mx-auto px-3.5 sm:px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar max-w-full">
+            <span className="text-xs font-mono text-white/40 uppercase tracking-wider shrink-0">Học CFOP:</span>
+            <nav className="flex gap-1 shrink-0">
               {NAV_PAGES.map((p) => (
-                <Link key={p} href={`/learn/${p}`} className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all uppercase ${p === 'pll' ? 'bg-[#00e5ff] text-black shadow-sm' : 'text-white/50 hover:text-white hover:bg-white/5'}`}>{p === 'basic' ? 'Cơ bản' : p}</Link>
+                <Link key={p} href={`/learn/${p}`} className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all uppercase whitespace-nowrap shrink-0 ${p === 'pll' ? 'bg-[#00e5ff] text-black shadow-sm' : 'text-white/50 hover:text-white hover:bg-white/5'}`}>{p === 'basic' ? 'Cơ bản' : p}</Link>
               ))}
             </nav>
           </div>
@@ -469,7 +469,7 @@ export default function PLLPage() {
           {filteredCases.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-white/30"><Search className="w-10 h-10 opacity-30" /><p className="text-sm">Không tìm thấy kết quả</p></div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {filteredCases.map((alg) => <PLLCard key={alg.id} alg={alg} onClick={() => setSelectedAlg(alg)} />)}
             </div>
           )}

@@ -377,15 +377,15 @@ export default function CrossPage() {
       <Navbar activeTab="learn" />
 
       {/* Sub-navigation bar for CFOP steps */}
-      <div className="bg-[#080c15]/90 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Học CFOP:</span>
-          <nav className="flex items-center gap-1 flex-wrap">
+      <div className="bg-[#080c15]/90 backdrop-blur-xl border-b border-white/[0.08] px-3.5 sm:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar">
+          <span className="text-xs font-mono text-white/40 uppercase tracking-wider shrink-0">Học CFOP:</span>
+          <nav className="flex items-center gap-1 shrink-0">
             {NAV_PAGES.map((page) => (
               <Link
                 key={page}
                 href={`/learn/${page}`}
-                className={`px-4 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+                className={`px-3 sm:px-4 py-1.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
                   page === 'cross'
                     ? 'bg-[#00e5ff] text-black shadow-md shadow-[#00e5ff]/25'
                     : 'text-white/50 hover:text-white hover:bg-white/5'

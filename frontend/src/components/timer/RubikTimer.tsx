@@ -82,6 +82,7 @@ export const RubikTimer: React.FC = () => {
   const inspectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const inspectionStartRef = useRef<number>(0);
+  const lastTouchTimeRef = useRef<number>(0);
 
   // Format milliseconds into mm:ss.xx
   const formatTime = (ms: number): string => {
@@ -363,8 +364,8 @@ export const RubikTimer: React.FC = () => {
     <div className={`w-full flex flex-col ${isFocusMode ? '' : 'xl:flex-row'} gap-6 transition-all duration-300`}>
       {/* Massive Speedcubing Stage Viewport */}
       <div
-        className={`flex-1 flex flex-col justify-between p-6 sm:p-10 bg-[#080C16]/90 backdrop-blur-3xl border border-white/10 rounded-[32px] relative overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)] transition-all duration-300 ${
-          isFocusMode ? 'min-h-[82vh]' : 'min-h-[640px]'
+        className={`flex-1 flex flex-col justify-between p-4 sm:p-8 lg:p-10 bg-[#080C16]/90 backdrop-blur-3xl border border-white/10 rounded-[28px] sm:rounded-[32px] relative overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)] transition-all duration-300 ${
+          isFocusMode ? 'min-h-[78dvh]' : 'min-h-[520px] sm:min-h-[640px]'
         }`}
       >
         {/* Subtle Ambient Radial Lighting */}
@@ -388,12 +389,12 @@ export const RubikTimer: React.FC = () => {
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Scramble Type Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-black/50 border border-white/10 rounded-2xl shadow-inner">
+            <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-black/50 border border-white/10 rounded-2xl shadow-inner overflow-x-auto no-scrollbar max-w-full">
               {(['3x3', 'cross', 'f2l', 'oll', 'pll'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setScrambleType(type)}
-                  className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-xl transition-all ${
+                  className={`px-2.5 sm:px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-xl transition-all shrink-0 ${
                     scrambleType === type
                       ? 'bg-gradient-to-r from-[#00F0FF] to-[#0088FF] text-black shadow-lg shadow-[#00F0FF]/25 font-bold'
                       : 'text-white/60 hover:text-white'
@@ -513,11 +514,23 @@ export const RubikTimer: React.FC = () => {
 
         {/* Center: Massive Focus Timer Digits (Dominant Stage Display) */}
         <div
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleTouchStart}
-          onMouseUp={handleTouchEnd}
-          className="my-auto py-10 sm:py-16 flex flex-col items-center justify-center cursor-pointer select-none relative group"
+          onTouchStart={() => {
+            lastTouchTimeRef.current = Date.now();
+            handleTouchStart();
+          }}
+          onTouchEnd={() => {
+            lastTouchTimeRef.current = Date.now();
+            handleTouchEnd();
+          }}
+          onMouseDown={() => {
+            if (Date.now() - lastTouchTimeRef.current < 600) return;
+            handleTouchStart();
+          }}
+          onMouseUp={() => {
+            if (Date.now() - lastTouchTimeRef.current < 600) return;
+            handleTouchEnd();
+          }}
+          className="my-auto py-8 sm:py-16 flex flex-col items-center justify-center cursor-pointer select-none relative group"
         >
           {/* Status Badge */}
           {status === 'inspecting' ? (
@@ -540,27 +553,27 @@ export const RubikTimer: React.FC = () => {
           <div
             className={`font-mono font-black tracking-tighter transition-all duration-100 tabular-nums select-none ${getTimerColorClass()} ${
               isFocusMode
-                ? 'text-8xl sm:text-[140px] md:text-[180px] lg:text-[230px] xl:text-[270px]'
-                : 'text-7xl sm:text-9xl md:text-[130px] lg:text-[160px] xl:text-[180px]'
+                ? 'text-[clamp(3.75rem,17vw,5.5rem)] sm:text-[140px] md:text-[180px] lg:text-[230px] xl:text-[270px]'
+                : 'text-[clamp(3.25rem,15vw,4.5rem)] sm:text-9xl md:text-[130px] lg:text-[160px] xl:text-[180px]'
             } leading-none`}
           >
             {status === 'inspecting' ? inspectionRemaining : formatTime(elapsedMs)}
           </div>
 
           {/* Contextual instruction */}
-          <p className="mt-6 text-xs sm:text-sm font-sans tracking-wide text-white/40 transition-opacity group-hover:text-white/70">
+          <p className="mt-5 sm:mt-6 text-center px-2 text-xs sm:text-sm font-sans tracking-wide text-white/40 transition-opacity group-hover:text-white/70">
             {status === 'running'
               ? '👉 Nhấn BẤT KỲ PHÍM NÀO hoặc chạm màn hình để dừng lại'
               : status === 'ready'
-              ? 'Thả Space để bứt tốc!'
+              ? 'Thả Space / Thả tay để bứt tốc!'
               : status === 'holding'
               ? 'Giữ yên 0.3s...'
-              : 'Nhấn giữ SPACE hoặc chạm vào 2 bàn tay bên dưới để chuẩn bị'}
+              : 'Nhấn giữ SPACE hoặc chạm giữ vào 2 bàn tay bên dưới để chuẩn bị'}
           </p>
 
           {/* Dual StackMat Hand Touch Pads (WCA Style) */}
           <div
-            className={`flex items-center justify-center gap-8 sm:gap-16 mt-8 transition-opacity duration-300 ${
+            className={`flex items-center justify-center gap-5 sm:gap-16 mt-6 sm:mt-8 transition-opacity duration-300 ${
               status === 'running' ? 'opacity-10' : 'opacity-100'
             }`}
           >
@@ -636,7 +649,7 @@ export const RubikTimer: React.FC = () => {
 
           {/* 2D Scramble Preview */}
           {showNet && (
-            <div className="shrink-0 hidden md:block">
+            <div className="shrink-0">
               <ScrambleNet scramble={scramble} />
             </div>
           )}

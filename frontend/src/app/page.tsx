@@ -504,16 +504,16 @@ function HomePageContent() {
       {/* ===================================================================== */}
       {/* 1. NAVIGATION BAR                                                     */}
       {/* ===================================================================== */}
-      <header className="sticky top-0 z-50 w-full bg-[#06090f]/85 backdrop-blur-xl border-b border-white/[0.08]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 w-full bg-[#06090f]/90 backdrop-blur-xl border-b border-white/[0.08]">
+        <div className="max-w-[1440px] mx-auto px-3.5 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: CUBEX Brand Logo */}
           <button
             type="button"
             onClick={() => goToSection('hero-3d')}
-            className="flex items-center gap-3.5 shrink-0 group text-left"
+            className="flex items-center gap-2.5 sm:gap-3.5 shrink-0 group text-left"
           >
             <div className="p-[2px] rounded-xl bg-gradient-to-br from-neonCyan via-sky-500 to-electricPurple shadow-cyan-glow group-hover:scale-105 transition-transform">
-              <div className="w-10 h-10 bg-[#070b13] rounded-[10px] p-2 grid grid-cols-2 grid-rows-2 gap-1">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#070b13] rounded-[10px] p-1.5 sm:p-2 grid grid-cols-2 grid-rows-2 gap-1">
                 <span className="rounded-[3px] bg-[#00e5ff]" />
                 <span className="rounded-[3px] bg-[#ff6b00]" />
                 <span className="rounded-[3px] bg-[#10b981]" />
@@ -522,10 +522,10 @@ function HomePageContent() {
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-xl font-extrabold tracking-tight text-white">CUBEX</span>
+                <span className="text-lg sm:text-xl font-extrabold tracking-tight text-white">CUBEX</span>
                 <span className="w-2 h-2 rounded-full bg-neonCyan shadow-[0_0_10px_#00e5ff]" />
               </div>
-              <span className="font-mono text-[9.5px] font-medium tracking-[0.22em] text-slate-400 mt-1 uppercase">
+              <span className="font-mono text-[9px] font-medium tracking-[0.22em] text-slate-400 mt-1 uppercase hidden sm:block">
                 THE ART OF SPEEDCUBING
               </span>
             </div>
@@ -720,13 +720,13 @@ function HomePageContent() {
           </nav>
 
           {/* Right: Language Toggle & Profile Pill */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
               onClick={toggleLanguage}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#0b0f18] border border-white/[0.09] hover:border-neonCyan/50 transition-all text-sm font-bold text-white"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-full bg-[#0b0f18] border border-white/[0.09] hover:border-neonCyan/50 transition-all text-xs sm:text-sm font-bold text-white"
             >
-              <svg className="w-4 h-4 text-neonCyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neonCyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
                 <path d="M2 12h20" />
@@ -736,7 +736,7 @@ function HomePageContent() {
 
             {/* Profile Pill or Login */}
             {isAuthenticated && user ? (
-              <div className="relative hidden sm:block shrink-0" ref={profileWrapperRef}>
+              <div className="relative shrink-0" ref={profileWrapperRef}>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -744,7 +744,7 @@ function HomePageContent() {
                     setLearnDropdownOpen(false);
                     setProfileMenuOpen((v) => !v);
                   }}
-                  className="whitespace-nowrap flex items-center gap-2.5 pl-1.5 pr-3.5 py-1.5 rounded-full bg-[#0b0f18] border border-white/[0.09] hover:border-electricPurple/50 transition-all"
+                  className="whitespace-nowrap flex items-center gap-2 pl-1.5 pr-2.5 sm:pr-3.5 py-1.5 rounded-full bg-[#0b0f18] border border-white/[0.09] hover:border-electricPurple/50 transition-all"
                 >
                   {user.avatarUrl ? (
                     <img
@@ -757,9 +757,9 @@ function HomePageContent() {
                       {currentUserInitial}
                     </div>
                   )}
-                  <span className="text-sm font-semibold text-white">{currentUserName}</span>
+                  <span className="text-sm font-semibold text-white max-w-[110px] sm:max-w-[130px] truncate hidden sm:inline">{currentUserName}</span>
                   <span
-                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                    className={`hidden md:inline-block text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
                       isAdmin
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                         : 'bg-neonCyan/15 text-neonCyan border border-neonCyan/25'
@@ -773,7 +773,7 @@ function HomePageContent() {
                 </button>
 
                 {profileMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-64 rounded-2xl bg-[#0d121d]/95 backdrop-blur-xl border border-white/10 shadow-2xl p-2 z-50">
+                  <div className="absolute right-0 mt-3 w-[min(16rem,calc(100vw-1.5rem))] rounded-2xl bg-[#0d121d]/95 backdrop-blur-xl border border-white/10 shadow-2xl p-2 z-50">
                     <div className="px-3 py-2.5 border-b border-white/[0.07] flex items-center gap-3">
                       {user.avatarUrl ? (
                         <img
@@ -871,19 +871,69 @@ function HomePageContent() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((v) => !v)}
-              className="xl:hidden p-2.5 rounded-xl bg-[#0b0f18] border border-white/10 text-slate-300 hover:text-neonCyan"
+              className="lg:hidden p-2 rounded-xl bg-[#0b0f18] border border-white/10 text-slate-300 hover:text-neonCyan"
               aria-label="Menu"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 6h16M4 12h16M4 18h16" />
+                {mobileMenuOpen ? (
+                  <path d="M18 6 6 18M6 6l12 12" />
+                ) : (
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                )}
               </svg>
             </button>
           </div>
         </div>
 
+        {/* Quick Horizontal Scrollable Taskbar for Mobile & Tablet (< 1024px) */}
+        <div className="flex lg:hidden items-center gap-1.5 px-3.5 pb-2.5 overflow-x-auto no-scrollbar border-t border-white/[0.05] pt-2">
+          <Link
+            href="/timer"
+            className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-[#0b0f18] border border-white/[0.06]"
+          >
+            <span className="w-2 h-2 rounded-full bg-neonCyan" />
+            <span>{dict.nav_timer}</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => goToSection('hero-3d')}
+            className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-[#0b0f18] border border-white/[0.06]"
+          >
+            <span>{dict.nav_3d}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => goToSection('performance-section')}
+            className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-[#0b0f18] border border-white/[0.06]"
+          >
+            <span>{dict.nav_stats}</span>
+          </button>
+          <Link
+            href="/match"
+            className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-[#0b0f18] border border-white/[0.06]"
+          >
+            <span>{dict.nav_battle}</span>
+          </Link>
+          <Link
+            href="/learn/basic"
+            className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 bg-[#0b0f18] border border-white/[0.06]"
+          >
+            <span>Học CFOP</span>
+          </Link>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setViewMode('admin')}
+              className="whitespace-nowrap shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 bg-[#0b0f18] border border-amber-500/25"
+            >
+              <span>{dict.nav_cms}</span>
+            </button>
+          )}
+        </div>
+
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="xl:hidden border-t border-white/[0.08] bg-[#080c15]/95 backdrop-blur-xl px-4 pt-3 pb-5 space-y-1.5">
+          <div className="lg:hidden border-t border-white/[0.08] bg-[#080c15]/98 backdrop-blur-xl px-4 pt-3 pb-5 space-y-1.5 max-h-[82dvh] overflow-y-auto">
             <Link
               href="/timer"
               className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#1a2232] text-white font-semibold text-sm"
@@ -953,22 +1003,36 @@ function HomePageContent() {
             </div>
 
             <div className="pt-3 mt-2 border-t border-white/10 flex items-center justify-between gap-3 px-2">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-neonCyan to-electricPurple flex items-center justify-center text-[#06090f] font-extrabold text-xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-neonCyan to-electricPurple flex items-center justify-center text-[#06090f] font-extrabold text-xs shrink-0">
                   {currentUserInitial}
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-white">{currentUserName}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-white truncate">
+                    {isAuthenticated && user ? currentUserName : 'Khách (Chưa đăng nhập)'}
+                  </div>
                   <div className="text-xs text-neonCyan font-mono">
                     PB: {pbDisplay} • Ao5: {ao5Display}
                   </div>
                 </div>
               </div>
-              {!isAuthenticated && (
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                    router.push('/login');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 font-bold text-xs shrink-0"
+                >
+                  Đăng xuất
+                </button>
+              ) : (
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-1.5 rounded-xl bg-neonCyan text-[#06090f] font-bold text-xs"
+                  className="px-3 py-1.5 rounded-xl bg-neonCyan text-[#06090f] font-bold text-xs shrink-0"
                 >
                   Đăng nhập
                 </Link>
@@ -1060,10 +1124,10 @@ function HomePageContent() {
 
                 <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">{dict.hero_subtitle}</p>
 
-                <div className="flex flex-wrap items-center gap-4 pt-1">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-1">
                   <Link
                     href="/timer"
-                    className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-neonCyan hover:bg-[#33ecff] text-[#06090f] font-bold text-sm sm:text-base shadow-cyan-glow hover:shadow-cyan-glow-lg transition-all active:scale-95"
+                    className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-2xl bg-neonCyan hover:bg-[#33ecff] text-[#06090f] font-bold text-sm sm:text-base shadow-cyan-glow hover:shadow-cyan-glow-lg transition-all active:scale-95"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                       <circle cx="12" cy="13" r="8" />
@@ -1075,7 +1139,7 @@ function HomePageContent() {
 
                   <a
                     href="#roadmap-section"
-                    className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 hover:border-white/25 text-white font-semibold text-sm sm:text-base backdrop-blur-md transition-all active:scale-95"
+                    className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 hover:border-white/25 text-white font-semibold text-sm sm:text-base backdrop-blur-md transition-all active:scale-95"
                   >
                     <svg className="w-5 h-5 text-electricPurple" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
@@ -1085,18 +1149,18 @@ function HomePageContent() {
                   </a>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/[0.08] max-w-xl">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-6 border-t border-white/[0.08] max-w-xl">
                   <div>
-                    <div className="font-mono text-xl sm:text-2xl font-extrabold text-white">50,000+</div>
-                    <div className="text-xs text-slate-400 mt-0.5">Lượt giải mỗi ngày</div>
+                    <div className="font-mono text-lg sm:text-2xl font-extrabold text-white">50,000+</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Lượt giải mỗi ngày</div>
                   </div>
                   <div>
-                    <div className="font-mono text-xl sm:text-2xl font-extrabold text-neonCyan">120+</div>
-                    <div className="text-xs text-slate-400 mt-0.5">Thuật toán CFOP 3D</div>
+                    <div className="font-mono text-lg sm:text-2xl font-extrabold text-neonCyan">120+</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Thuật toán CFOP 3D</div>
                   </div>
                   <div>
-                    <div className="font-mono text-xl sm:text-2xl font-extrabold text-purple-400">128+</div>
-                    <div className="text-xs text-slate-400 mt-0.5">Cuber đấu Live 1v1</div>
+                    <div className="font-mono text-lg sm:text-2xl font-extrabold text-purple-400">128+</div>
+                    <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Cuber đấu Live 1v1</div>
                   </div>
                 </div>
               </div>
@@ -1369,18 +1433,18 @@ function HomePageContent() {
                 </div>
 
                 {/* KPI Row: EXACTLY 3 BOXES */}
-                <div className="grid grid-cols-3 gap-3 sm:gap-4 my-6 w-full">
-                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
-                    <div className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-slate-400">SINGLE BEST</div>
-                    <div className="text-xl sm:text-2xl font-mono font-bold text-cyan-400 whitespace-nowrap mt-1.5">{pbDisplay}</div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 my-6 w-full">
+                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-2.5 sm:p-4 min-w-0">
+                    <div className="text-[9.5px] sm:text-xs font-mono uppercase tracking-wider text-slate-400 truncate">SINGLE BEST</div>
+                    <div className="text-base sm:text-2xl font-mono font-bold text-cyan-400 whitespace-nowrap mt-1">{pbDisplay}</div>
                   </div>
-                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
-                    <div className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-slate-400">CURRENT AO5</div>
-                    <div className="text-xl sm:text-2xl font-mono font-bold text-white whitespace-nowrap mt-1.5">{ao5Display}</div>
+                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-2.5 sm:p-4 min-w-0">
+                    <div className="text-[9.5px] sm:text-xs font-mono uppercase tracking-wider text-slate-400 truncate">CURRENT AO5</div>
+                    <div className="text-base sm:text-2xl font-mono font-bold text-white whitespace-nowrap mt-1">{ao5Display}</div>
                   </div>
-                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4">
-                    <div className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-slate-400">CURRENT AO12</div>
-                    <div className="text-xl sm:text-2xl font-mono font-bold text-purple-400 whitespace-nowrap mt-1.5">{ao12Display}</div>
+                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-2.5 sm:p-4 min-w-0">
+                    <div className="text-[9.5px] sm:text-xs font-mono uppercase tracking-wider text-slate-400 truncate">CURRENT AO12</div>
+                    <div className="text-base sm:text-2xl font-mono font-bold text-purple-400 whitespace-nowrap mt-1">{ao12Display}</div>
                   </div>
                 </div>
 

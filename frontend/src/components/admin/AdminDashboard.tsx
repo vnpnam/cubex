@@ -317,7 +317,7 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="w-full flex flex-col gap-8">
       {/* Admin Section Tabs */}
-      <div className="flex flex-wrap gap-2 p-1 bg-black/40 border border-white/10 rounded-2xl w-fit">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2 p-1 bg-black/40 border border-white/10 rounded-2xl w-full sm:w-fit max-w-full overflow-x-auto no-scrollbar">
         {([
           { id: 'algorithms' as const, label: 'Thuật Toán', icon: Database },
           { id: 'music' as const, label: 'Quản Lý Nhạc', icon: Music },
@@ -725,7 +725,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Modal for Edit / Add Algorithm */}
       {editingAlg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-fade-in">
-          <div className="w-full max-w-xl bg-[#0E131F] border border-white/10 rounded-3xl p-6 shadow-2xl">
+          <div className="w-full max-w-xl max-h-[90dvh] overflow-y-auto bg-[#0E131F] border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <h3 className="text-lg font-bold text-white">
                 {isAddingNew ? 'Thêm Thuật Toán Mới' : `Chỉnh Sửa ${editingAlg.code}`}
@@ -833,7 +833,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Modal for Edit System Music Track */}
       {editingTrack && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-fade-in">
-          <div className="w-full max-w-lg bg-[#0E131F] border border-white/10 rounded-3xl p-6 shadow-2xl">
+          <div className="w-full max-w-lg max-h-[90dvh] overflow-y-auto bg-[#0E131F] border border-white/10 rounded-3xl p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-[#00F0FF]/15 border border-[#00F0FF]/30 flex items-center justify-center">

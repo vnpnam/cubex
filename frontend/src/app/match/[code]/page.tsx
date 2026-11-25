@@ -181,6 +181,7 @@ export default function MatchRoomPage() {
   const inspectionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const timerPhaseRef = useRef<TimerPhase>('waiting');
+  const lastTouchRef = useRef<number>(0);
 
   useEffect(() => {
     timerPhaseRef.current = timerPhase;
@@ -816,13 +817,16 @@ export default function MatchRoomPage() {
             {/* 2. WCA BATTLE TIMER ARENA STAGE */}
             <div
               onMouseDown={() => {
+                if (Date.now() - lastTouchRef.current < 600) return;
                 if (timerPhase === 'ready' || timerPhase === 'inspecting') beginHold();
                 else if (timerPhase === 'solving') stopTimer(false);
               }}
               onMouseUp={() => {
+                if (Date.now() - lastTouchRef.current < 600) return;
                 if (timerPhase === 'holding' || timerPhase === 'armed') releaseHold();
               }}
               onTouchStart={(e) => {
+                lastTouchRef.current = Date.now();
                 if (timerPhase === 'ready' || timerPhase === 'inspecting') {
                   e.preventDefault();
                   beginHold();
@@ -832,12 +836,13 @@ export default function MatchRoomPage() {
                 }
               }}
               onTouchEnd={(e) => {
+                lastTouchRef.current = Date.now();
                 if (timerPhase === 'holding' || timerPhase === 'armed') {
                   e.preventDefault();
                   releaseHold();
                 }
               }}
-              className={`relative rounded-3xl border-2 transition-all duration-200 select-none overflow-hidden flex flex-col items-center justify-center py-10 sm:py-14 px-6 ${
+              className={`relative rounded-3xl border-2 transition-all duration-200 select-none overflow-hidden flex flex-col items-center justify-center py-8 sm:py-14 px-4 sm:px-6 ${
                 timerPhase === 'armed'
                   ? 'bg-emerald-950/30 border-emerald-400 shadow-[0_0_50px_rgba(16,185,129,0.25)] cursor-pointer'
                   : timerPhase === 'holding'
@@ -899,7 +904,7 @@ export default function MatchRoomPage() {
               ) : (
                 <div className="flex items-baseline justify-center font-mono font-black select-none">
                   <span
-                    className={`text-7xl sm:text-8xl md:text-9xl tracking-tight leading-none transition-colors ${
+                    className={`text-6xl sm:text-8xl md:text-9xl tracking-tight leading-none transition-colors ${
                       timerPhase === 'armed'
                         ? 'text-emerald-400 drop-shadow-[0_0_30px_rgba(16,185,129,0.5)]'
                         : timerPhase === 'holding'
