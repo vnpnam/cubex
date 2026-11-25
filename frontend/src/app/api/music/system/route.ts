@@ -15,6 +15,15 @@ export interface ServerSystemTrack {
 
 const DEFAULT_SYSTEM_TRACKS: ServerSystemTrack[] = [
   {
+    id: 1000,
+    title: 'Một Màu Cô Đơn',
+    artist: 'Quang Đăng Trần',
+    coverUrl: null,
+    audioUrl: '/music/mot-mau-co-don.mp3',
+    source: 'system',
+    isDefault: true,
+  },
+  {
     id: 1001,
     title: 'Lo-Fi Speedcubing',
     artist: 'CUBEX Beats',

@@ -28,8 +28,16 @@ function resolveUrl(url: string) {
   return `${API_URL}${url}`;
 }
 
-// Demo tracks – hoạt động mà không cần backend
+// Demo tracks – hoạt động mà không cần backend (tích hợp sẵn trên CDN)
 const DEMO_TRACKS: Track[] = [
+  {
+    id: 1000,
+    title: 'Một Màu Cô Đơn',
+    artist: 'Quang Đăng Trần',
+    coverUrl: null,
+    audioUrl: '/music/mot-mau-co-don.mp3',
+    source: 'system',
+  },
   {
     id: 1001,
     title: 'Lo-Fi Speedcubing',

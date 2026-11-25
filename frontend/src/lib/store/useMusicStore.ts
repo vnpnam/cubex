@@ -81,12 +81,21 @@ export function sortTracksAndPickDefault(tracks: Track[]): {
   };
 }
 
+export const DEFAULT_INITIAL_TRACK: Track = {
+  id: 1000,
+  title: 'Một Màu Cô Đơn',
+  artist: 'Quang Đăng Trần',
+  coverUrl: null,
+  audioUrl: '/music/mot-mau-co-don.mp3',
+  source: 'system',
+};
+
 export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
-      systemTracks: [],
+      systemTracks: [DEFAULT_INITIAL_TRACK],
       userTracks: [],
-      currentTrack: null,
+      currentTrack: DEFAULT_INITIAL_TRACK,
       isPlaying: true,
       currentTime: 0,
       duration: 0,
@@ -215,16 +224,12 @@ export const useMusicStore = create<MusicState>()(
     }),
     {
       name: 'cubex-music',
-      version: 3,
+      version: 4,
       migrate: (persistedState: unknown, version: number) => {
         const state = (persistedState as Record<string, unknown>) || {};
-        if (version < 3) {
+        if (version < 4) {
           state.volume = 0.15;
-          // Clear old default track so "Một Màu Cô Đơn" becomes the default track
-          const ct = state.currentTrack as Track | null | undefined;
-          if (ct && !isPreferredDefaultTrackTitle(ct.title)) {
-            state.currentTrack = null;
-          }
+          state.currentTrack = DEFAULT_INITIAL_TRACK;
         }
         return state as unknown as MusicState;
       },
