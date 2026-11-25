@@ -160,33 +160,36 @@ function writeAccountsRegistry(accounts: User[]) {
 
 function loadStoredAuth(): { user: User | null; token: string | null } {
   if (typeof window === 'undefined') {
-    return { user: DEMO_USER, token: 'mock-jwt-token-cubex-2026' };
+    return { user: null, token: null };
   }
   try {
     const sessionUser = sessionStorage.getItem('cubex_user');
     const sessionToken = sessionStorage.getItem('cubex_token');
     if (sessionUser && sessionToken) {
-      return { user: JSON.parse(sessionUser) as User, token: sessionToken };
+      const parsed = JSON.parse(sessionUser) as User;
+      if (parsed.id !== 'cubist-demo-id') {
+        return { user: parsed, token: sessionToken };
+      }
     }
 
     const rawUser = localStorage.getItem('cubex_user');
     const rawToken = localStorage.getItem('cubex_token');
     if (rawUser && rawToken) {
-      return { user: JSON.parse(rawUser) as User, token: rawToken };
-    }
-    if (localStorage.getItem('cubex_logged_out') === '1') {
-      return { user: null, token: null };
+      const parsed = JSON.parse(rawUser) as User;
+      if (parsed.id !== 'cubist-demo-id') {
+        return { user: parsed, token: rawToken };
+      }
     }
   } catch {
     // ignore storage errors
   }
-  return { user: DEMO_USER, token: 'mock-jwt-token-cubex-2026' };
+  return { user: null, token: null };
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: DEMO_USER,
-  token: 'mock-jwt-token-cubex-2026',
-  isAuthenticated: true,
+  user: null,
+  token: null,
+  isAuthenticated: false,
   isAdmin: false,
 
   setUser: (user, token) => {
