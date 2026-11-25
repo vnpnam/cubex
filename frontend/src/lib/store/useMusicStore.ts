@@ -99,7 +99,7 @@ export const useMusicStore = create<MusicState>()(
       isPlaying: true,
       currentTime: 0,
       duration: 0,
-      volume: 0.15,
+      volume: 0.2,
       repeatMode: 'all',
       shuffleEnabled: false,
       isLoading: false,
@@ -224,11 +224,11 @@ export const useMusicStore = create<MusicState>()(
     }),
     {
       name: 'cubex-music',
-      version: 4,
+      version: 5,
       migrate: (persistedState: unknown, version: number) => {
         const state = (persistedState as Record<string, unknown>) || {};
-        if (version < 4) {
-          state.volume = 0.15;
+        if (version < 5) {
+          state.volume = 0.2;
           state.currentTrack = DEFAULT_INITIAL_TRACK;
         }
         return state as unknown as MusicState;

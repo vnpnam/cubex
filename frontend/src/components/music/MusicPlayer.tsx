@@ -239,7 +239,7 @@ export function MusicPlayer() {
     const audio = new Audio();
     audio.preload = 'auto';
     audio.autoplay = true;
-    audio.volume = useMusicStore.getState().volume ?? 0.15;
+    audio.volume = useMusicStore.getState().volume ?? 0.2;
     audioRef.current = audio;
 
     // Fallback unlock when browser blocks initial unmuted autoplay before first interaction
@@ -652,7 +652,7 @@ export function MusicPlayer() {
 
               <div className="flex items-center gap-1 ml-auto flex-1">
                 <button
-                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.15)}
+                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.2)}
                   className="text-white/40 hover:text-white transition-colors"
                 >
                   {store.volume === 0 ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -980,7 +980,7 @@ export function MusicPlayer() {
               {/* Volume slider */}
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.15)}
+                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.2)}
                   className="text-white/40 hover:text-[#00F0FF] transition-colors"
                   title={store.volume === 0 ? 'Bật âm' : 'Tắt âm'}
                 >

@@ -8,17 +8,7 @@ let isOfflineSimulation = false;
 let broadcastChannel: BroadcastChannel | null = null;
 let storageListenerAttached = false;
 let botTimerId: ReturnType<typeof setTimeout> | null = null;
-
-function sanitizeApiUrl(raw?: string): string {
-  if (!raw) return 'http://localhost:5247';
-  const cleaned = raw.trim().replace(/^https?:\/\/(https?:\/\/)/i, '$1');
-  if (cleaned.includes('localhost:5247.trycloudflare.com')) {
-    return 'http://localhost:5247';
-  }
-  return cleaned.replace(/\/+$/, '');
-}
-
-const API_URL = sanitizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+let serverSyncIntervalId: ReturnType<typeof setInterval> | null = null;
 
 const BOT_USER_ID = 'bot-quangminh-3x3';
 const BOT_NAME = 'QuangMinh_3x3 (Bot Sub-12)';
@@ -40,11 +30,11 @@ interface SharedRoomSnapshot {
 
 /**
  * Returns a unique player identity per browser tab when two tabs share the same logged-in user,
- * so testing 1v1 across 2 tabs on the same browser always treats Tab 1 and Tab 2 as 2 distinct players.
+ * so testing 1v1 across 2 tabs or 2 devices always treats Player 1 and Player 2 as 2 distinct players.
  */
 export function getLocalTabPlayer(): { userId: string; displayName: string } {
   const user = useAuthStore.getState().user;
-  const baseName = user?.displayName ?? 'Minh Speedcuber';
+  const baseName = user?.displayName ?? 'Cubist';
   const baseId = user?.id ?? 'cubist-user';
 
   if (typeof window === 'undefined') {
@@ -86,6 +76,23 @@ function writeSharedRoom(snapshot: SharedRoomSnapshot) {
   }
 }
 
+function buildSnapshotFromStore(): SharedRoomSnapshot | null {
+  const st = useMatchStore.getState();
+  if (!st.roomCode) return null;
+  return {
+    code: st.roomCode,
+    status: st.roomStatus,
+    bestOf: st.bestOf || 3,
+    hostUserId: st.hostUserId || st.players[0]?.userId || '',
+    players: st.players,
+    currentRound: st.currentRound,
+    rounds: st.rounds,
+    matchWinnerId: st.matchWinnerId,
+    matchWinnerName: st.matchWinnerName,
+    updatedAt: Date.now(),
+  };
+}
+
 function applySnapshotToStore(snapshot: SharedRoomSnapshot) {
   const store = useMatchStore.getState();
   if (store.roomCode && store.roomCode !== snapshot.code) return;
@@ -103,6 +110,61 @@ function applySnapshotToStore(snapshot: SharedRoomSnapshot) {
     isConnecting: false,
     error: null,
   });
+}
+
+async function callServerRoomApi(payload: Record<string, unknown>): Promise<SharedRoomSnapshot | null> {
+  try {
+    const res = await fetch('/api/match/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data?.error) throw new Error(data.error);
+      return null;
+    }
+    return (data?.room as SharedRoomSnapshot) ?? null;
+  } catch (err) {
+    if (payload.action === 'join' && err instanceof Error && err.message.includes('đủ 2 người')) {
+      throw err;
+    }
+    return null;
+  }
+}
+
+function startServerSyncLoop() {
+  if (typeof window === 'undefined') return;
+  if (serverSyncIntervalId) return;
+
+  serverSyncIntervalId = setInterval(async () => {
+    const st = useMatchStore.getState();
+    const code = st.roomCode;
+    if (!code) return;
+
+    const me = getLocalTabPlayer();
+    const currentSnap = readSharedRoom(code) || buildSnapshotFromStore();
+
+    const serverRoom = await callServerRoomApi({
+      action: 'sync',
+      code,
+      player: { userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 },
+      snapshot: currentSnap,
+    });
+
+    if (serverRoom && useMatchStore.getState().roomCode === code) {
+      writeSharedRoom(serverRoom);
+      applySnapshotToStore(serverRoom);
+    }
+  }, 1000);
+}
+
+function stopServerSyncLoop() {
+  if (serverSyncIntervalId) {
+    clearInterval(serverSyncIntervalId);
+    serverSyncIntervalId = null;
+  }
 }
 
 function ensureLocalSyncChannels() {
@@ -134,6 +196,8 @@ function ensureLocalSyncChannels() {
       }
     });
   }
+
+  startServerSyncLoop();
 }
 
 export function getConnection() {
@@ -144,166 +208,67 @@ export function isUsingOfflineSimulation() {
   return isOfflineSimulation;
 }
 
-export async function connectMatch(token: string, roomCodeHint?: string): Promise<signalR.HubConnection | null> {
+export async function connectMatch(_token: string, roomCodeHint?: string): Promise<signalR.HubConnection | null> {
   ensureLocalSyncChannels();
-
-  if (connection && connection.state === signalR.HubConnectionState.Connected) {
-    isOfflineSimulation = false;
-    return connection;
-  }
+  connection = null;
+  isOfflineSimulation = true;
 
   const store = useMatchStore.getState();
   const targetCode = roomCodeHint?.toUpperCase() || store.roomCode || undefined;
-  store.setIsConnecting(true);
+  store.setIsConnecting(false);
   store.setError(null);
 
-  // If using a local demo/mock token, use local P2P room sync directly without throwing WebSocket errors
-  if (token === 'admin-token' || token === 'mock-jwt-token-cubex-2026') {
-    connection = null;
-    isOfflineSimulation = true;
-    store.setIsConnecting(false);
-    // Re-hydrate current room if already inside one, or initialize if opened via URL
-    if (targetCode) {
-      const existing = readSharedRoom(targetCode);
-      if (existing && existing.players.length > 0) {
-        applySnapshotToStore(existing);
-      } else {
-        const me = getLocalTabPlayer();
-        const fallbackSnapshot: SharedRoomSnapshot = {
-          code: targetCode,
-          status: 'waiting',
-          bestOf: store.bestOf || 3,
-          hostUserId: me.userId,
-          players: [{ userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 }],
-          currentRound: null,
-          rounds: [],
-          matchWinnerId: null,
-          matchWinnerName: null,
-          updatedAt: Date.now(),
-        };
-        writeSharedRoom(fallbackSnapshot);
-        applySnapshotToStore(fallbackSnapshot);
-      }
-    }
-    return null;
-  }
+  if (targetCode) {
+    const me = getLocalTabPlayer();
+    const localExisting = readSharedRoom(targetCode);
 
-  connection = new signalR.HubConnectionBuilder()
-    .withUrl(`${API_URL}/hubs/match?access_token=${token}`, {
-      skipNegotiation: true,
-      transport: signalR.HttpTransportType.WebSockets,
-    })
-    .withAutomaticReconnect([0, 2000, 5000, 10000])
-    .configureLogging(signalR.LogLevel.None)
-    .build();
-
-  connection.on('RoomCreated', (state: RoomState) => {
-    store.setRoom(state.code, 'waiting', state.bestOf, state.hostUserId, state.players);
-    store.setIsConnecting(false);
-  });
-
-  connection.on('RoomUpdated', (state: RoomState) => {
-    store.setRoom(state.code, state.status as never, state.bestOf, state.hostUserId, state.players);
-    store.setIsConnecting(false);
-  });
-
-  connection.on('Reconnected', () => {
-    store.setError(null);
-  });
-
-  connection.on('PlayerReady', ({ userId, ready }: { userId: string; ready: boolean }) => {
-    store.setPlayerReady(userId, ready);
-  });
-
-  connection.on('PlayerDisconnected', ({ userId }: { userId: string }) => {
-    store.setPlayerReady(userId, false);
-  });
-
-  connection.on('PlayerLeft', ({ userId }: { userId: string }) => {
-    const { players } = useMatchStore.getState();
-    store.updatePlayers(players.filter((p) => p.userId !== userId));
-  });
-
-  connection.on('RoundStarted', (data: {
-    roundId: number;
-    roundNumber: number;
-    scramble: string;
-    startedAt: string;
-  }) => {
-    store.startRound({
-      roundId: data.roundId,
-      roundNumber: data.roundNumber,
-      scramble: data.scramble,
-      startedAt: data.startedAt,
-      results: [],
-      status: 'solving',
+    // Check shared server room first so cross-device / phone / incognito syncs immediately
+    const serverRoom = await callServerRoomApi({
+      action: 'join',
+      code: targetCode,
+      player: { userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 },
     });
-  });
 
-  connection.on('ResultSubmitted', (data: { userId: string; timeMs: number | null; isDnf: boolean }) => {
-    store.submitResult(data.userId, data.timeMs, data.isDnf);
-  });
-
-  connection.on('RoundFinished', (data: {
-    roundId: number;
-    results: RoundResult[];
-    scores: { userId: string; wins: number }[];
-  }) => {
-    store.finishRound(data.results, data.scores);
-  });
-
-  connection.on('MatchFinished', (data: { winnerId: string; displayName: string }) => {
-    store.finishMatch(data.winnerId, data.displayName);
-  });
-
-  connection.on('WaitingForNextRound', () => {
-    const s = useMatchStore.getState();
-    s.updatePlayers(s.players.map((p) => ({ ...p, isReady: false })));
-  });
-
-  connection.onreconnecting(() => store.setIsConnecting(true));
-  connection.onreconnected(() => store.setIsConnecting(false));
-  connection.onclose(() => {
-    store.setIsConnecting(false);
-  });
-
-  try {
-    await connection.start();
-    isOfflineSimulation = false;
-    store.setIsConnecting(false);
-    return connection;
-  } catch {
-    connection = null;
-    isOfflineSimulation = true;
-    store.setError(null);
-    store.setIsConnecting(false);
-    if (targetCode) {
-      const existing = readSharedRoom(targetCode);
-      if (existing && existing.players.length > 0) {
-        applySnapshotToStore(existing);
-      } else {
-        const me = getLocalTabPlayer();
-        const fallbackSnapshot: SharedRoomSnapshot = {
+    if (serverRoom) {
+      // Merge with any local players if same machine
+      if (localExisting && localExisting.players.length > serverRoom.players.length) {
+        const synced = await callServerRoomApi({
+          action: 'sync',
           code: targetCode,
-          status: 'waiting',
-          bestOf: store.bestOf || 3,
-          hostUserId: me.userId,
-          players: [{ userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 }],
-          currentRound: null,
-          rounds: [],
-          matchWinnerId: null,
-          matchWinnerName: null,
-          updatedAt: Date.now(),
-        };
-        writeSharedRoom(fallbackSnapshot);
-        applySnapshotToStore(fallbackSnapshot);
+          snapshot: localExisting,
+        });
+        const finalRoom = synced || localExisting;
+        writeSharedRoom(finalRoom);
+        applySnapshotToStore(finalRoom);
+      } else {
+        writeSharedRoom(serverRoom);
+        applySnapshotToStore(serverRoom);
       }
+    } else if (localExisting && localExisting.players.length > 0) {
+      applySnapshotToStore(localExisting);
+    } else {
+      const fallbackSnapshot: SharedRoomSnapshot = {
+        code: targetCode,
+        status: 'waiting',
+        bestOf: store.bestOf || 3,
+        hostUserId: me.userId,
+        players: [{ userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 }],
+        currentRound: null,
+        rounds: [],
+        matchWinnerId: null,
+        matchWinnerName: null,
+        updatedAt: Date.now(),
+      };
+      writeSharedRoom(fallbackSnapshot);
+      applySnapshotToStore(fallbackSnapshot);
     }
-    return null;
   }
+
+  return null;
 }
 
 export async function disconnectMatch() {
+  stopServerSyncLoop();
   if (botTimerId) {
     clearTimeout(botTimerId);
     botTimerId = null;
@@ -326,11 +291,6 @@ function generateRoomCode(): string {
 }
 
 export async function createRoom(bestOf: number) {
-  if (connection && !isOfflineSimulation) {
-    await connection.invoke('CreateRoom', bestOf);
-    return;
-  }
-
   ensureLocalSyncChannels();
   const me = getLocalTabPlayer();
   const code = generateRoomCode();
@@ -352,49 +312,97 @@ export async function createRoom(bestOf: number) {
 
   writeSharedRoom(snapshot);
   applySnapshotToStore(snapshot);
+
+  // Sync created room to Next.js server API so any phone / other computer can join by code
+  const serverRoom = await callServerRoomApi({
+    action: 'create',
+    code,
+    snapshot,
+  });
+  if (serverRoom) {
+    writeSharedRoom(serverRoom);
+    applySnapshotToStore(serverRoom);
+  }
 }
 
 export async function joinRoom(rawCode: string) {
+  ensureLocalSyncChannels();
   const code = rawCode.trim().toUpperCase();
-  if (connection && !isOfflineSimulation) {
-    await connection.invoke('JoinRoom', code);
+  const me = getLocalTabPlayer();
+
+  // 1. Try joining on the shared Next.js server API first (works across Phone, PC, Incognito, etc.)
+  const serverRoom = await callServerRoomApi({
+    action: 'join',
+    code,
+    player: {
+      userId: me.userId,
+      displayName: me.displayName,
+      isReady: false,
+      wins: 0,
+    },
+  });
+
+  // 2. Also check localStorage if testing across 2 tabs of the same browser
+  const localExisting = readSharedRoom(code);
+
+  if (localExisting) {
+    const alreadyInLocal = localExisting.players.some((p) => p.userId === me.userId);
+    if (!alreadyInLocal && localExisting.players.length >= 2) {
+      throw new Error(`Phòng ${code} đã đủ 2 người chơi.`);
+    }
+
+    const updatedPlayers = [...localExisting.players];
+    if (!alreadyInLocal) {
+      const hostName = localExisting.players[0]?.displayName;
+      const guestName =
+        hostName === me.displayName ? `${me.displayName} (Đối thủ)` : me.displayName;
+      updatedPlayers.push({
+        userId: me.userId,
+        displayName: guestName,
+        isReady: false,
+        wins: 0,
+      });
+    }
+
+    const updatedLocal: SharedRoomSnapshot = {
+      ...localExisting,
+      players: updatedPlayers,
+      updatedAt: Date.now(),
+    };
+
+    writeSharedRoom(updatedLocal);
+    applySnapshotToStore(updatedLocal);
+
+    // Sync merged local state up to server
+    await callServerRoomApi({
+      action: 'sync',
+      code,
+      snapshot: updatedLocal,
+    });
     return;
   }
 
-  ensureLocalSyncChannels();
-  const me = getLocalTabPlayer();
-  const existing = readSharedRoom(code);
-
-  if (!existing) {
-    throw new Error(`Không tìm thấy phòng ${code}. Hãy kiểm tra lại mã phòng.`);
+  if (serverRoom) {
+    writeSharedRoom(serverRoom);
+    applySnapshotToStore(serverRoom);
+    return;
   }
 
-  const alreadyInRoom = existing.players.some((p) => p.userId === me.userId);
-  if (!alreadyInRoom && existing.players.length >= 2) {
-    throw new Error(`Phòng ${code} đã đủ 2 người chơi.`);
-  }
-
-  let updatedPlayers = [...existing.players];
-  if (!alreadyInRoom) {
-    // If both tabs have the same display name, distinguish player 2 slightly so it's clear
-    const hostName = existing.players[0]?.displayName;
-    const guestName = hostName === me.displayName ? `${me.displayName} (Đối thủ)` : me.displayName;
-    updatedPlayers.push({
-      userId: me.userId,
-      displayName: guestName,
-      isReady: false,
-      wins: 0,
-    });
-  }
-
-  const updated: SharedRoomSnapshot = {
-    ...existing,
-    players: updatedPlayers,
+  // Fallback if offline: still allow entering the room code so 1s sync loop connects both players
+  const fallbackRoom: SharedRoomSnapshot = {
+    code,
+    status: 'waiting',
+    bestOf: 3,
+    hostUserId: me.userId,
+    players: [{ userId: me.userId, displayName: me.displayName, isReady: false, wins: 0 }],
+    currentRound: null,
+    rounds: [],
+    matchWinnerId: null,
+    matchWinnerName: null,
     updatedAt: Date.now(),
   };
-
-  writeSharedRoom(updated);
-  applySnapshotToStore(updated);
+  writeSharedRoom(fallbackRoom);
+  applySnapshotToStore(fallbackRoom);
 }
 
 /**
@@ -405,7 +413,7 @@ export function addBotOpponentToRoom() {
   const code = store.roomCode;
   if (!code) return;
 
-  const existing = readSharedRoom(code);
+  const existing = readSharedRoom(code) || buildSnapshotFromStore();
   const basePlayers = existing?.players ?? store.players;
   if (basePlayers.length >= 2) return;
 
@@ -429,27 +437,32 @@ export function addBotOpponentToRoom() {
 
   writeSharedRoom(snapshot);
   applySnapshotToStore(snapshot);
+
+  callServerRoomApi({
+    action: 'add-bot',
+    code,
+    snapshot,
+  }).then((serverRoom) => {
+    if (serverRoom) {
+      writeSharedRoom(serverRoom);
+      applySnapshotToStore(serverRoom);
+    }
+  });
 }
 
 export async function setReady(ready: boolean) {
-  if (connection && !isOfflineSimulation) {
-    await connection.invoke('SetReady', ready);
-    return;
-  }
-
   const store = useMatchStore.getState();
   const code = store.roomCode;
   if (!code) return;
 
   const me = getLocalTabPlayer();
-  const existing = readSharedRoom(code);
+  const existing = readSharedRoom(code) || buildSnapshotFromStore();
   if (!existing) return;
 
   let players = existing.players.map((p) =>
     p.userId === me.userId ? { ...p, isReady: ready } : p
   );
 
-  // If playing with Bot, Bot is always ready
   if (players.some((p) => p.userId === BOT_USER_ID)) {
     players = players.map((p) => (p.userId === BOT_USER_ID ? { ...p, isReady: true } : p));
   }
@@ -458,7 +471,8 @@ export async function setReady(ready: boolean) {
 
   let status: MatchStatus = existing.status;
   let currentRound = existing.currentRound;
-  let rounds = [...existing.rounds];
+  const rounds = [...existing.rounds];
+  const scramble = generateLocal3x3Scramble(20);
 
   if (bothReady && (existing.status === 'waiting' || existing.currentRound?.status === 'finished')) {
     status = 'playing';
@@ -466,7 +480,7 @@ export async function setReady(ready: boolean) {
     const newRound: MatchRound = {
       roundId: Date.now(),
       roundNumber: nextRoundNum,
-      scramble: generateLocal3x3Scramble(20),
+      scramble,
       startedAt: new Date().toISOString(),
       results: [],
       status: 'solving',
@@ -486,20 +500,28 @@ export async function setReady(ready: boolean) {
 
   writeSharedRoom(updated);
   applySnapshotToStore(updated);
+
+  const serverRoom = await callServerRoomApi({
+    action: 'ready',
+    code,
+    userId: me.userId,
+    ready,
+    scramble,
+    snapshot: updated,
+  });
+  if (serverRoom) {
+    writeSharedRoom(serverRoom);
+    applySnapshotToStore(serverRoom);
+  }
 }
 
-export async function submitResult(roundId: number, timeMs: number | null) {
-  if (connection && !isOfflineSimulation) {
-    await connection.invoke('SubmitResult', roundId, timeMs);
-    return;
-  }
-
+export async function submitResult(_roundId: number, timeMs: number | null) {
   const store = useMatchStore.getState();
   const code = store.roomCode;
   if (!code) return;
 
   const me = getLocalTabPlayer();
-  const existing = readSharedRoom(code);
+  const existing = readSharedRoom(code) || buildSnapshotFromStore();
   if (!existing || !existing.currentRound) return;
 
   const myValidTime = timeMs ?? 12000;
@@ -516,7 +538,6 @@ export async function submitResult(roundId: number, timeMs: number | null) {
   if (existingIdx >= 0) results[existingIdx] = myEntry;
   else results.push(myEntry);
 
-  // If opponent is Bot, generate Bot's result too
   const hasBot = existing.players.some((p) => p.userId === BOT_USER_ID);
   if (hasBot && !results.some((r) => r.userId === BOT_USER_ID)) {
     const botTimeMs = Math.round(9800 + Math.random() * 3800);
@@ -537,9 +558,7 @@ export async function submitResult(roundId: number, timeMs: number | null) {
   let matchWinnerId = existing.matchWinnerId;
   let matchWinnerName = existing.matchWinnerName;
 
-  // Check if both players have submitted
   if (results.length >= existing.players.length && existing.players.length === 2) {
-    // Determine round winner (lowest non-DNF timeMs)
     const validResults = results
       .filter((r) => !r.isDnf && r.timeMs !== null)
       .sort((a, b) => (a.timeMs ?? Infinity) - (b.timeMs ?? Infinity));
@@ -554,7 +573,7 @@ export async function submitResult(roundId: number, timeMs: number | null) {
     players = players.map((p) => ({
       ...p,
       wins: p.wins + (p.userId === roundWinnerId ? 1 : 0),
-      isReady: p.userId === BOT_USER_ID, // Reset human ready state for next round
+      isReady: p.userId === BOT_USER_ID,
     }));
 
     currentRound = {
@@ -589,9 +608,22 @@ export async function submitResult(roundId: number, timeMs: number | null) {
 
   writeSharedRoom(updated);
   applySnapshotToStore(updated);
+
+  const serverRoom = await callServerRoomApi({
+    action: 'submit',
+    code,
+    userId: me.userId,
+    timeMs,
+    snapshot: updated,
+  });
+  if (serverRoom) {
+    writeSharedRoom(serverRoom);
+    applySnapshotToStore(serverRoom);
+  }
 }
 
 export async function leaveRoom(explicitCode?: string) {
+  stopServerSyncLoop();
   if (botTimerId) {
     clearTimeout(botTimerId);
     botTimerId = null;
@@ -599,18 +631,17 @@ export async function leaveRoom(explicitCode?: string) {
 
   const store = useMatchStore.getState();
   const code = (explicitCode || store.roomCode || '').toUpperCase();
+  const me = getLocalTabPlayer();
   store.reset();
-
-  if (connection && !isOfflineSimulation) {
-    try {
-      await connection.invoke('LeaveRoom');
-    } catch {}
-    return;
-  }
 
   if (!code) return;
 
-  const me = getLocalTabPlayer();
+  callServerRoomApi({
+    action: 'leave',
+    code,
+    userId: me.userId,
+  }).catch(() => {});
+
   const existing = readSharedRoom(code);
   if (existing) {
     const remaining = existing.players.filter(
@@ -631,12 +662,4 @@ export async function leaveRoom(explicitCode?: string) {
       writeSharedRoom(updated);
     }
   }
-}
-
-interface RoomState {
-  code: string;
-  status: string;
-  bestOf: number;
-  hostUserId: string;
-  players: MatchPlayer[];
 }
