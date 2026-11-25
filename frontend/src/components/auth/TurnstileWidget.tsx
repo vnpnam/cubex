@@ -30,9 +30,8 @@ interface TurnstileWidgetProps {
   resetSignal?: number;
 }
 
-// Default fallback is Cloudflare's official Always-Pass test sitekey when NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set
 const SITE_KEY =
-  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || '1x00000000000000000000AA';
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || '0x4AAAAAAGSi8aBIw3Sf_1oW';
 
 export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onVerify,

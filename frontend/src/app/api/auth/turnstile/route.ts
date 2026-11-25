@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
-// Default fallback is Cloudflare's official Always-Pass test secret key when TURNSTILE_SECRET_KEY is not set
-const SECRET_KEY =
-  process.env.TURNSTILE_SECRET_KEY?.trim() || '1x0000000000000000000000000000000AA';
-
 export async function verifyTurnstileTokenOnServer(
   token: string,
   remoteIp?: string | null
@@ -14,9 +10,15 @@ export async function verifyTurnstileTokenOnServer(
     return { success: false, errorCodes: ['missing-input-response'] };
   }
 
+  const secretKey = process.env.TURNSTILE_SECRET_KEY?.trim();
+  // If TURNSTILE_SECRET_KEY has not been added to Vercel env vars yet, accept non-empty widget token so login isn't blocked
+  if (!secretKey) {
+    return { success: true };
+  }
+
   try {
     const formData = new URLSearchParams();
-    formData.append('secret', SECRET_KEY);
+    formData.append('secret', secretKey);
     formData.append('response', token);
     if (remoteIp) {
       formData.append('remoteip', remoteIp);
