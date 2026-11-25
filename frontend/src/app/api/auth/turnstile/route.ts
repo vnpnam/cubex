@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
-export async function verifyTurnstileTokenOnServer(
+async function verifyTurnstileTokenOnServer(
   token: string,
   remoteIp?: string | null
 ): Promise<{ success: boolean; errorCodes?: string[] }> {
