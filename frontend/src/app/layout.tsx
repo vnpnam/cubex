@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { MusicPlayer } from '@/components/music/MusicPlayer';
 
 export const metadata: Metadata = {
   title: 'CUBEX – The Art of Speedcubing | WCA Standard Rubik 3x3 Platform',
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="vi" className="dark h-full antialiased">
       <body className="min-h-full flex flex-col bg-[#070A12] text-white selection:bg-[#00F0FF]/30 selection:text-white font-sans overflow-x-hidden">
         {children}
+        <MusicPlayer />
       </body>
     </html>
   );

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-obsidian: #06090f;
+  --color-surface: #0d111a;
+  --color-neonCyan: #00e5ff;
+  --color-electricPurple: #8b5cf6;
+  --color-rubikOrange: #ff6b00;
+  --color-rubikGreen: #10b981;
+  --color-rubikYellow: #facc15;
+  --shadow-cyan-glow: 0 0 24px rgba(0, 229, 255, 0.28);
+  --shadow-cyan-glow-lg: 0 0 40px rgba(0, 229, 255, 0.38);
+  --shadow-purple-glow: 0 0 28px rgba(139, 92, 246, 0.3);
+}
+
 :root {
   --background: #070a12;
   --foreground: #ffffff;
@@ -7,28 +20,117 @@
 }
 
 body {
-  background-color: #070a12;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #06090f;
+  color: #f8fafc;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Scrollbar for Sleek Linear/Apple Aesthetic */
+/* Subtle dark grid background */
+.bg-grid-pattern {
+  background-size: 46px 46px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+}
+
+/* Glassmorphism cards */
+.glass-card {
+  background: rgba(13, 17, 26, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.glass-card-hover:hover {
+  border-color: rgba(0, 229, 255, 0.38);
+  box-shadow: 0 12px 36px -12px rgba(0, 229, 255, 0.18);
+  transform: translateY(-2px);
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: #06090f;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #1e293b;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.4);
+  background: #00e5ff;
+}
+
+/* 3D CSS Rubik's Cube */
+.cube-scene {
+  perspective: 950px;
+  touch-action: none;
+  user-select: none;
+}
+
+.cube-3d {
+  width: 192px;
+  height: 192px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.08s linear;
+}
+
+@media (min-width: 640px) {
+  .cube-3d {
+    width: 222px;
+    height: 222px;
+  }
+}
+
+.cube-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: #080b11;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.85);
+  backface-visibility: hidden;
+}
+
+.sticker {
+  border-radius: 7px;
+  box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.3), inset 0 -2px 5px rgba(0, 0, 0, 0.35);
+  transition: background-color 0.2s ease;
+}
+
+.cube-pulse {
+  animation: cubeMovePulse 0.22s ease-out;
+}
+
+@keyframes cubeMovePulse {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.32) drop-shadow(0 0 16px rgba(0, 229, 255, 0.5)); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+.animate-float-delayed {
+  animation: floatSlow 4.5s ease-in-out 1.2s infinite;
 }

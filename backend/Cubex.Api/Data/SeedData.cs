@@ -68,6 +68,44 @@ public static class SeedData
             }
         }
 
+        // 3b. Pre-created Accounts: admin / 123456, vnpnam1 / 123456 & vnpnam2 / 123456
+        var customAccounts = new[]
+        {
+            (username: "admin", email: "admin@cubex.vn", display: "Cubex Administrator", wca: "2026CUBE01", isAdmin: true),
+            (username: "vnpnam1", email: "vnpnam1@cubex.vn", display: "vnpnam1", wca: "2026NAM01", isAdmin: false),
+            (username: "vnpnam2", email: "vnpnam2@cubex.vn", display: "vnpnam2", wca: "2026NAM02", isAdmin: false)
+        };
+        foreach (var acc in customAccounts)
+        {
+            var existingUser = await userManager.FindByNameAsync(acc.username)
+                               ?? await userManager.FindByEmailAsync(acc.email);
+            if (existingUser == null)
+            {
+                var newUser = new ApplicationUser
+                {
+                    UserName = acc.username,
+                    Email = acc.email,
+                    DisplayName = acc.display,
+                    WcaId = acc.wca,
+                    Bio = acc.isAdmin ? "CUBEX Lead Architect & Administrator." : "CUBEX Pro Speedcuber.",
+                    EmailConfirmed = true,
+                    PreferredLanguage = "vi",
+                    ThemePreference = "dark",
+                    CreatedAt = DateTime.UtcNow
+                };
+                var hasher = new PasswordHasher<ApplicationUser>();
+                newUser.PasswordHash = hasher.HashPassword(newUser, "123456");
+                var createRes = await userManager.CreateAsync(newUser);
+                if (createRes.Succeeded)
+                {
+                    if (acc.isAdmin)
+                        await userManager.AddToRolesAsync(newUser, new[] { "Admin", "Cubist" });
+                    else
+                        await userManager.AddToRoleAsync(newUser, "Cubist");
+                }
+            }
+        }
+
         // 4. Algorithms
         if (!context.Algorithms.Any())
         {

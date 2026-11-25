@@ -1,4 +1,4 @@
-﻿# .NET
+# .NET
 bin/
 obj/
 .vs/
@@ -23,6 +23,13 @@ out/
 .env
 .env.local
 .env.*.local
+
+# Runtime logs & backups
+.login-audit-logs.json
+frontend/.login-audit-logs.json
+frontend/.ui-backup-before-redesign/
+backend/Cubex.Api/wwwroot/uploads/
+backend/Cubex.Api/wwwroot/emails/
 
 # OS / IDE
 .DS_Store

@@ -10,8 +10,26 @@ public record RegisterDto(
 );
 
 public record LoginDto(
-    [Required, EmailAddress] string Email,
+    [Required] string Email,
     [Required] string Password
+);
+
+public record GoogleLoginDto(
+    string? IdToken,
+    string? AccessToken
+);
+
+public record LoginAuditLogDto(
+    int Id,
+    string UserId,
+    string Email,
+    string DisplayName,
+    string LoginMethod,
+    DateTime LoginAt,
+    string Browser,
+    string Device,
+    string EmailStatus,
+    string? ResendMessageId
 );
 
 public record AuthResponseDto(
@@ -30,7 +48,9 @@ public record UserDto(
     IList<string> Roles,
     string PreferredLanguage,
     string ThemePreference,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    DateTime? LastLoginAt = null,
+    string? AuthProvider = null
 );
 
 public record UpdateProfileDto(
