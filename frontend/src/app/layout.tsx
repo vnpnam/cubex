@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { MusicPlayer } from '@/components/music/MusicPlayer';
+import { TurnstileEntryGate } from '@/components/auth/TurnstileEntryGate';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -24,8 +25,10 @@ export default function RootLayout({
   return (
     <html lang="vi" className="dark h-full antialiased">
       <body className="min-h-full flex flex-col bg-[#070A12] text-white selection:bg-[#00F0FF]/30 selection:text-white font-sans overflow-x-hidden">
-        {children}
-        <MusicPlayer />
+        <TurnstileEntryGate>
+          {children}
+          <MusicPlayer />
+        </TurnstileEntryGate>
       </body>
     </html>
   );

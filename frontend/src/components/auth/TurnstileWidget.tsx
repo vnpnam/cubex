@@ -28,6 +28,7 @@ interface TurnstileWidgetProps {
   onExpire?: () => void;
   onError?: () => void;
   resetSignal?: number;
+  theme?: 'light' | 'dark' | 'auto';
 }
 
 const SITE_KEY =
@@ -38,6 +39,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onExpire,
   onError,
   resetSignal = 0,
+  theme = 'dark',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -62,7 +64,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
       containerRef.current.innerHTML = '';
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: SITE_KEY,
-        theme: 'dark',
+        theme,
         size: 'flexible',
         callback: (token: string) => {
           callbacksRef.current.onVerify(token);
