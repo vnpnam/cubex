@@ -22,7 +22,9 @@ import {
   AlertCircle,
   Loader2,
   X,
+  ShieldCheck,
 } from 'lucide-react';
+import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 
 function sanitizeApiUrl(raw?: string): string {
   if (!raw) return 'http://localhost:5247';
@@ -68,6 +70,8 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
 
   // Fallback Google chooser if Firebase Google provider is not yet enabled in console
   const [googleChooserOpen, setGoogleChooserOpen] = useState(false);
@@ -216,7 +220,35 @@ export default function LoginPage() {
       return;
     }
 
+    if (!turnstileToken) {
+      setErrorMsg('Vui lòng đợi xác thực bảo mật Cloudflare Turnstile hoàn tất.');
+      return;
+    }
+
     setLoading(true);
+
+    // 0. Verify Cloudflare Turnstile token on server API
+    try {
+      const tsRes = await fetch('/api/auth/turnstile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: turnstileToken }),
+      });
+      const tsData = await tsRes.json().catch(() => ({ success: false }));
+      if (!tsRes.ok || !tsData.success) {
+        setErrorMsg(
+          tsData?.error || 'Xác thực Cloudflare Turnstile thất bại. Vui lòng thử lại.'
+        );
+        setLoading(false);
+        setTurnstileToken(null);
+        setTurnstileReset((c) => c + 1);
+        return;
+      }
+    } catch {
+      setErrorMsg('Không thể kết nối máy chủ xác thực Cloudflare Turnstile.');
+      setLoading(false);
+      return;
+    }
 
     // 1. Check built-in preset accounts (admin / 123456, vnpnam1 / 123456, vnpnam2 / 123456)
     const matchedPreset = PRESET_ACCOUNTS.find(
@@ -229,6 +261,8 @@ export default function LoginPage() {
       if (matchedPreset.password !== password) {
         setErrorMsg('Tài khoản hoặc mật khẩu không chính xác.');
         setLoading(false);
+        setTurnstileToken(null);
+        setTurnstileReset((c) => c + 1);
         return;
       }
 
@@ -433,10 +467,34 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Cloudflare Turnstile Protection Widget */}
+          <div className="pt-1">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <ShieldCheck className="w-3.5 h-3.5 text-neonCyan" />
+                Bảo vệ chống Bot bởi Cloudflare Turnstile
+              </span>
+              {turnstileToken && (
+                <span className="text-[10px] font-mono text-rubikGreen font-bold">
+                  ✓ Đã xác minh
+                </span>
+              )}
+            </div>
+            <TurnstileWidget
+              onVerify={(token) => {
+                setTurnstileToken(token);
+                setErrorMsg(null);
+              }}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+              resetSignal={turnstileReset}
+            />
+          </div>
+
           <button
             type="submit"
-            disabled={loading || googleLoading}
-            className="w-full py-3.5 rounded-2xl bg-neonCyan hover:bg-[#33ecff] text-[#06090f] font-extrabold text-sm shadow-cyan-glow transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+            disabled={loading || googleLoading || !turnstileToken}
+            className="w-full py-3.5 rounded-2xl bg-neonCyan hover:bg-[#33ecff] text-[#06090f] font-extrabold text-sm shadow-cyan-glow transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2 cursor-pointer"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
