@@ -7,6 +7,13 @@ function authHeaders(token: string) {
 
 export async function fetchSystemTracks() {
   try {
+    const res = await fetch('/api/music/system', { cache: 'no-store' });
+    if (res.ok) {
+      return res.json();
+    }
+  } catch {}
+
+  try {
     const res = await fetch(`${API_URL}/api/music/system`);
     if (!res.ok) return [];
     return res.json();
@@ -58,21 +65,23 @@ export async function deleteUserTrack(token: string, id: number) {
   if (!res.ok) throw new Error('Delete failed');
 }
 
-// Admin
+// Admin — Uses built-in Next.js /api/music/system route so it works on Vercel & local dev
 export async function createSystemTrack(
   token: string,
   title: string,
   artist: string,
-  audioFile: File,
-  coverFile?: File
+  audioFile: File | Blob,
+  coverFile?: File | Blob,
+  customId?: number
 ) {
   const form = new FormData();
+  if (customId) form.append('id', String(customId));
   form.append('title', title);
   form.append('artist', artist);
-  form.append('audioFile', audioFile);
-  if (coverFile) form.append('coverFile', coverFile);
+  form.append('audioFile', audioFile, (audioFile as File).name || 'track.mp3');
+  if (coverFile) form.append('coverFile', coverFile, (coverFile as File).name || 'cover.jpg');
 
-  const res = await fetch(`${API_URL}/api/music/system`, {
+  const res = await fetch('/api/music/system', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -85,17 +94,20 @@ export async function updateSystemTrack(
   token: string,
   id: number,
   data: { title?: string; artist?: string; isActive?: boolean; isDefault?: boolean; sortOrder?: number },
-  coverFile?: File
+  coverFile?: File,
+  audioFile?: File
 ) {
   const form = new FormData();
+  form.append('id', String(id));
   if (data.title != null) form.append('title', data.title);
   if (data.artist != null) form.append('artist', data.artist);
   if (data.isActive != null) form.append('isActive', String(data.isActive));
   if (data.isDefault != null) form.append('isDefault', String(data.isDefault));
   if (data.sortOrder != null) form.append('sortOrder', String(data.sortOrder));
   if (coverFile) form.append('coverFile', coverFile);
+  if (audioFile) form.append('audioFile', audioFile);
 
-  const res = await fetch(`${API_URL}/api/music/system/${id}`, {
+  const res = await fetch('/api/music/system', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
     body: form,
@@ -105,7 +117,7 @@ export async function updateSystemTrack(
 }
 
 export async function deleteSystemTrack(token: string, id: number) {
-  const res = await fetch(`${API_URL}/api/music/system/${id}`, {
+  const res = await fetch(`/api/music/system?id=${id}`, {
     method: 'DELETE',
     headers: authHeaders(token),
   });

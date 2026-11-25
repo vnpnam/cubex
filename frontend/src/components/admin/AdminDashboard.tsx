@@ -175,41 +175,45 @@ export const AdminDashboard: React.FC = () => {
     const coverFile = musicCover;
     const title = musicTitle;
     const artist = musicArtist;
+    const id = Date.now();
 
-    const isDemo = !token || token.startsWith('mock-') || token.startsWith('demo-') || token.startsWith('admin-');
-
-    // Store blob in IndexedDB – audioUrl stored as "local:<id>" marker so it persists in localStorage
-    const addLocal = async () => {
-      const id = Date.now();
+    // Always save a local IndexedDB copy for instant offline playback AND upload to shared /api/music/system
+    const saveLocalBackup = async (serverAudioUrl?: string, serverCoverUrl?: string | null) => {
       await saveAudioBlob(id, audioFile);
-      let coverObjectUrl: string | null = null;
+      let coverObjectUrl: string | null = serverCoverUrl ?? null;
       if (coverFile) {
         await saveCoverBlob(id, coverFile);
-        coverObjectUrl = URL.createObjectURL(coverFile); // cover is small, session-only is fine for display
+        if (!coverObjectUrl) {
+          coverObjectUrl = URL.createObjectURL(coverFile);
+        }
       }
       const newTrack: Track = {
         id,
         title,
         artist: artist || 'Unknown',
         coverUrl: coverObjectUrl,
-        audioUrl: localMarker(id), // "local:<id>" persists to localStorage; audio engine resolves from IDB
+        audioUrl: serverAudioUrl || localMarker(id),
         source: 'system',
       };
-      musicStore.setSystemTracks([...musicStore.systemTracks, newTrack]);
-      // No localStorage patching needed: localMarker is not blob: so partialize allows it through
+      musicStore.setSystemTracks([
+        newTrack,
+        ...musicStore.systemTracks.filter((t) => t.id !== id),
+      ]);
     };
 
     try {
-      if (!isDemo) {
-        try {
-          const track = await createSystemTrack(token!, title, artist, audioFile, coverFile ?? undefined);
-          musicStore.setSystemTracks([...musicStore.systemTracks, { ...track, source: 'system' as const }]);
-        } catch {
-          // Backend unavailable → use local data URL
-          await addLocal();
-        }
-      } else {
-        await addLocal();
+      try {
+        const track = await createSystemTrack(
+          token || 'admin-token',
+          title,
+          artist,
+          audioFile,
+          coverFile ?? undefined,
+          id
+        );
+        await saveLocalBackup(track.audioUrl, track.coverUrl);
+      } catch {
+        await saveLocalBackup();
       }
       setMusicStatus('success');
       setMusicTitle('');
@@ -217,7 +221,7 @@ export const AdminDashboard: React.FC = () => {
       setMusicAudio(null);
       setMusicCover(null);
       setTimeout(() => setMusicStatus('idle'), 2000);
-    } catch (err) {
+    } catch {
       setMusicStatus('error');
       setMusicError('Không thể thêm bài hát.');
     }
@@ -264,26 +268,22 @@ export const AdminDashboard: React.FC = () => {
         newCoverUrl = URL.createObjectURL(editTrackCover);
       }
 
-      const isDemo =
-        !token ||
-        token.startsWith('mock-') ||
-        token.startsWith('demo-') ||
-        token.startsWith('admin-');
-
-      if (!isDemo && token) {
-        try {
-          const updated = await updateSystemTrack(
-            token,
-            editingTrack.id,
-            { title: newTitle, artist: newArtist },
-            editTrackCover ?? undefined
-          );
-          if (updated?.coverUrl && !editTrackCover) {
-            newCoverUrl = updated.coverUrl;
-          }
-        } catch {
-          // Offline / local fallback still updates store below
+      try {
+        const updated = await updateSystemTrack(
+          token || 'admin-token',
+          editingTrack.id,
+          { title: newTitle, artist: newArtist },
+          editTrackCover ?? undefined,
+          editTrackAudio ?? undefined
+        );
+        if (updated?.audioUrl && !editTrackAudio) {
+          newAudioUrl = updated.audioUrl;
         }
+        if (updated?.coverUrl && !editTrackCover) {
+          newCoverUrl = updated.coverUrl;
+        }
+      } catch {
+        // Offline / local fallback still updates store below
       }
 
       musicStore.updateSystemTrackInStore(editingTrack.id, {

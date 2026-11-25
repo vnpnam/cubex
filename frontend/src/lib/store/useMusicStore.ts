@@ -54,6 +54,33 @@ interface MusicState {
   updateUserTrackInStore: (id: number, patch: Partial<Track>) => void;
 }
 
+export function isPreferredDefaultTrackTitle(title?: string | null): boolean {
+  if (!title) return false;
+  const norm = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .trim();
+  return norm.includes('mot mau co don');
+}
+
+export function sortTracksAndPickDefault(tracks: Track[]): {
+  sorted: Track[];
+  defaultTrack: Track | null;
+} {
+  const sorted = [...tracks].sort((a, b) => {
+    const aMatch = isPreferredDefaultTrackTitle(a.title) ? 1 : 0;
+    const bMatch = isPreferredDefaultTrackTitle(b.title) ? 1 : 0;
+    return bMatch - aMatch;
+  });
+  const preferred = sorted.find((t) => isPreferredDefaultTrackTitle(t.title));
+  return {
+    sorted,
+    defaultTrack: preferred ?? sorted[0] ?? null,
+  };
+}
+
 export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
@@ -63,7 +90,7 @@ export const useMusicStore = create<MusicState>()(
       isPlaying: true,
       currentTime: 0,
       duration: 0,
-      volume: 0.3,
+      volume: 0.15,
       repeatMode: 'all',
       shuffleEnabled: false,
       isLoading: false,
@@ -72,10 +99,20 @@ export const useMusicStore = create<MusicState>()(
       activeSource: 'system',
 
       setSystemTracks: (tracks) =>
-        set((state) => ({
-          systemTracks: tracks,
-          currentTrack: state.currentTrack ?? tracks[0] ?? null,
-        })),
+        set((state) => {
+          const { sorted, defaultTrack } = sortTracksAndPickDefault(tracks);
+          const preferred = sorted.find((t) => isPreferredDefaultTrackTitle(t.title));
+          // Always select "Một Màu Cô Đơn" as default if present and currentTrack isn't already it
+          const nextCurrent =
+            preferred ??
+            (state.currentTrack && sorted.some((t) => t.id === state.currentTrack?.id)
+              ? state.currentTrack
+              : defaultTrack);
+          return {
+            systemTracks: sorted,
+            currentTrack: nextCurrent,
+          };
+        }),
       setUserTracks: (tracks) => set({ userTracks: tracks }),
 
       play: (track) => {
@@ -178,11 +215,16 @@ export const useMusicStore = create<MusicState>()(
     }),
     {
       name: 'cubex-music',
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown, version: number) => {
         const state = (persistedState as Record<string, unknown>) || {};
-        if (version < 2 && (state.volume === 0.8 || state.volume === undefined)) {
-          state.volume = 0.3;
+        if (version < 3) {
+          state.volume = 0.15;
+          // Clear old default track so "Một Màu Cô Đơn" becomes the default track
+          const ct = state.currentTrack as Track | null | undefined;
+          if (ct && !isPreferredDefaultTrackTitle(ct.title)) {
+            state.currentTrack = null;
+          }
         }
         return state as unknown as MusicState;
       },

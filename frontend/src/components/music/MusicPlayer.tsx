@@ -7,16 +7,24 @@ import {
   Music, ChevronDown, ChevronUp, Repeat, Shuffle, List,
   Upload, Trash2, Loader2, Edit2, Check, X
 } from 'lucide-react';
-import { useMusicStore, Track } from '@/lib/store/useMusicStore';
+import { useMusicStore, Track, isPreferredDefaultTrackTitle, sortTracksAndPickDefault } from '@/lib/store/useMusicStore';
 import { useAuthStore } from '@/lib/store/useAuthStore';
-import { fetchSystemTracks, fetchUserTracks, uploadUserTrack, deleteUserTrack } from '@/lib/api/musicApi';
+import { fetchSystemTracks, fetchUserTracks, uploadUserTrack, deleteUserTrack, createSystemTrack } from '@/lib/api/musicApi';
 import { saveAudioBlob, saveCoverBlob, loadAudioUrl, loadCoverUrl, deleteLocalTrack, isLocalMarker, localMarkerId, localMarker } from '@/lib/store/musicDb';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5247';
 
 function resolveUrl(url: string) {
   if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('blob:')) return url;
+  if (
+    url.startsWith('http') ||
+    url.startsWith('blob:') ||
+    url.startsWith('local:') ||
+    url.startsWith('/api/') ||
+    url.startsWith('/music/')
+  ) {
+    return url;
+  }
   return `${API_URL}${url}`;
 }
 
@@ -111,10 +119,39 @@ export function MusicPlayer() {
 
     const applySystemTracksAndAutoplay = (tracksToUse: Track[]) => {
       const st = useMusicStore.getState();
-      st.setSystemTracks(tracksToUse);
-      const targetTrack = st.currentTrack ?? tracksToUse[0] ?? null;
+      const { sorted, defaultTrack } = sortTracksAndPickDefault(tracksToUse);
+      st.setSystemTracks(sorted);
+      const preferred = sorted.find((t) => isPreferredDefaultTrackTitle(t.title));
+      const targetTrack = preferred ?? st.currentTrack ?? defaultTrack;
       if (targetTrack && !userManuallyPausedRef.current) {
         st.play(targetTrack);
+      }
+    };
+
+    // Automatically push any local IndexedDB system tracks (such as "Một Màu Cô Đơn" added by Admin)
+    // to the shared Next.js /api/music/system server so all other visitors also receive them!
+    const syncLocalTracksToServer = async (localTracks: Track[], serverTracks: Track[]) => {
+      for (const lt of localTracks) {
+        if (!isLocalMarker(lt.audioUrl)) continue;
+        const alreadyOnServer = serverTracks.some(
+          (st) =>
+            st.id === lt.id ||
+            (st.title.trim().toLowerCase() === lt.title.trim().toLowerCase() &&
+              !isLocalMarker(st.audioUrl))
+        );
+        if (alreadyOnServer) continue;
+
+        try {
+          const id = localMarkerId(lt.audioUrl);
+          const blobUrl = await loadAudioUrl(id);
+          if (!blobUrl) continue;
+          const resp = await fetch(blobUrl);
+          const blob = await resp.blob();
+          URL.revokeObjectURL(blobUrl);
+          await createSystemTrack(token || 'admin-token', lt.title, lt.artist, blob, undefined, lt.id);
+        } catch {
+          // ignore sync errors
+        }
       }
     };
 
@@ -125,18 +162,34 @@ export function MusicPlayer() {
           source: 'system' as const,
           audioUrl: resolveUrl(t.audioUrl),
         }));
+        const persisted = useMusicStore.getState().systemTracks;
+        const localTracks = await validateLocalTracks(
+          persisted.filter((t) => isLocalMarker(t.audioUrl))
+        );
+
+        if (localTracks.length > 0) {
+          syncLocalTracksToServer(localTracks, mapped).catch(() => {});
+        }
+
         if (mapped.length > 0) {
-          // Keep local-added tracks and preserve any persisted local edits
-          const persisted = useMusicStore.getState().systemTracks;
           const persistedById = new Map(persisted.map((t) => [t.id, t]));
           const mergedBackend = mapped.map((t: Track) => {
             const localOverride = persistedById.get(t.id);
-            return localOverride ? { ...t, title: localOverride.title, artist: localOverride.artist } : t;
+            return localOverride
+              ? { ...t, title: localOverride.title, artist: localOverride.artist }
+              : t;
           });
-          const localTracks = await validateLocalTracks(persisted.filter((t) => isLocalMarker(t.audioUrl)));
-          applySystemTracksAndAutoplay([...mergedBackend, ...localTracks]);
+          // Deduplicate localTracks that are already in mergedBackend by ID or title
+          const uniqueLocal = localTracks.filter(
+            (lt) =>
+              !mergedBackend.some(
+                (bt: Track) =>
+                  bt.id === lt.id ||
+                  bt.title.trim().toLowerCase() === lt.title.trim().toLowerCase()
+              )
+          );
+          applySystemTracksAndAutoplay([...uniqueLocal, ...mergedBackend]);
         } else {
-          const persisted = useMusicStore.getState().systemTracks;
           if (persisted.length > 0) {
             const valid = await validateLocalTracks(persisted);
             applySystemTracksAndAutoplay(valid.length > 0 ? valid : DEMO_TRACKS);
@@ -178,7 +231,7 @@ export function MusicPlayer() {
     const audio = new Audio();
     audio.preload = 'auto';
     audio.autoplay = true;
-    audio.volume = useMusicStore.getState().volume ?? 0.3;
+    audio.volume = useMusicStore.getState().volume ?? 0.15;
     audioRef.current = audio;
 
     // Fallback unlock when browser blocks initial unmuted autoplay before first interaction
@@ -591,7 +644,7 @@ export function MusicPlayer() {
 
               <div className="flex items-center gap-1 ml-auto flex-1">
                 <button
-                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.3)}
+                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.15)}
                   className="text-white/40 hover:text-white transition-colors"
                 >
                   {store.volume === 0 ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -919,7 +972,7 @@ export function MusicPlayer() {
               {/* Volume slider */}
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.3)}
+                  onClick={() => store.setVolume(store.volume > 0 ? 0 : 0.15)}
                   className="text-white/40 hover:text-[#00F0FF] transition-colors"
                   title={store.volume === 0 ? 'Bật âm' : 'Tắt âm'}
                 >
